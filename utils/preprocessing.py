@@ -43,8 +43,8 @@ def load_zip(zip_path, max_returns, thresholds):
 
     df = pd.DataFrame(records)
     
-    envs = sorted(df['env_name'].unique())
-    utds = sorted(df['utd'].unique())
+    envs = sorted(df['env_name'].unique().tolist())
+    utds = sorted(df['utd'].unique().tolist())
     batch_sizes = sorted(df['batch_size'].unique())
     learning_rates = sorted(df['learning_rate'].unique())
     

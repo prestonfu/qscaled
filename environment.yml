@@ -1,0 +1,15 @@
+name: value-scaling
+channels:
+  - defaults
+dependencies:
+  - python=3.10
+  - numpy
+  - pip:
+      - ipykernel
+      - matplotlib
+      - pandas
+      - scikit-learn
+      - scipy
+      - seaborn
+      - tqdm
+      - wandb
