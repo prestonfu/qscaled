@@ -11,9 +11,9 @@ from typing import Dict, List, Tuple, Any
 from tqdm import tqdm
 from multiprocessing.pool import ThreadPool
 
-api = wandb.Api(timeout=120)
 np.random.seed(42)
 
+api = wandb.Api(timeout=120)
 DUMMY_VALUE = 'None'
 
 
@@ -36,6 +36,10 @@ class BaseRunCollector(abc.ABC):
     def _set_wandb_keys(self):
         """Specifies keys to fetch from Wandb."""
         self.wandb_keys = None
+        raise NotImplementedError
+    
+    @abc.abstractmethod
+    def generate_key(self, run):
         raise NotImplementedError
     
     @abc.abstractmethod
@@ -141,6 +145,24 @@ class BaseRunCollector(abc.ABC):
                     insert(run)
             collector.save_state(path)
         return collector
+    
+    def add_tag(self, tags: List[str], new_tag: str, *args, parallel=True, **kw):
+        """
+        Updates tags of all runs with tags in `tags` that pass the (args, kw) filter
+        by adding `new_tag`.
+        """
+        runs = api.runs(self.project, {"tags": {"$in": tags}})
+        def update(run):
+            if self._check_key(self.generate_key(run), *args, **kw):
+                if new_tag not in run.tags:
+                    run.tags.append(new_tag)
+                    run.update()
+        if parallel:
+            with ThreadPool() as pool:
+                list(tqdm(pool.imap(update, runs), total=len(runs)))
+        else:
+            for run in tqdm(runs, total=len(runs)):
+                update(run)
 
 
 class CRLRunCollector(BaseRunCollector):
@@ -151,7 +173,7 @@ class CRLRunCollector(BaseRunCollector):
         
     def _set_category_index(self):
         """Specifies categories and their order."""
-        self.categories = ['env', 'utd', 'bs', 'lr']
+        self.categories = ['env', 'utd', 'batch_size', 'learning_rate']
         self.num_categories = len(self.categories)
         self.category_index = {cat: i for i, cat in enumerate(self.categories)}
         
@@ -167,22 +189,24 @@ class CRLRunCollector(BaseRunCollector):
             'training/critic_gnorm_l2',
         ]
         
+    def generate_key(self, run):
+        env = run.config["env_name"]
+        utd = run.config["utd_ratio"]
+        batch_size = run.config["batch_size"]
+        learning_rate = run.config["agent.critic_lr"]
+        key = (env, utd, batch_size, learning_rate)  # key is given in same order as `self.categories`
+        return key
+        
     def insert(self, run, verbose=False):
         if run.state != 'finished' and verbose:
             print(f'{run.name} skipped with status {run.state}')
-            return
-        
-        env = run.config["env_name"]
-        utd = run.config["utd_ratio"]
-        bs = run.config["batch_size"]
-        lr = run.config["agent.critic_lr"]
-        key = (env, utd, bs, lr)  # key is given in same order as `self.categories`
+            return       
 
         df = self.wandb_fetch(run)
         if df is None and verbose:
             print(f'Failed to fetch {run.name} from Wandb')
         else:
-            self.data[key].append(df)
+            self.data[self.generate_key(run)].append(df)
     
     def load_state(self, path):
         self.data.update(np.load(path, allow_pickle=True).item())
