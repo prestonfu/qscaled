@@ -4,10 +4,10 @@ Implementation of a workflow for evaluating trade-offs between data efficiency,
 compute efficiency, and performance for online RL, validated across multiple
 environments.
 
- [Oleh Rybkin](https://people.eecs.berkeley.edu/~oleh/)\*<sup>1</sup>,
- [Michal Nauman](https://scholar.google.com/citations?user=GnEVRtQAAAAJ&hl=en)\*<sup>1,2</sup>,
- [Preston Fu](https://prestonfu.com/)\*<sup>1</sup>,
- [Charlie Snell](https://sea-snell.github.io/)\*<sup>1</sup>,
+ [Oleh Rybkin](https://people.eecs.berkeley.edu/~oleh/)<sup>1</sup>,
+ [Michal Nauman](https://scholar.google.com/citations?user=GnEVRtQAAAAJ&hl=en)<sup>1,2</sup>,
+ [Preston Fu](https://prestonfu.com/)<sup>1</sup>,
+ [Charlie Snell](https://sea-snell.github.io/)<sup>1</sup>,
  [Pieter Abbeel](https://people.eecs.berkeley.edu/~pabbeel/)<sup>1</sup>,
  [Sergey Levine](https://people.eecs.berkeley.edu/~svlevine/)<sup>1</sup>,
  [Aviral Kumar](https://aviralkumar2907.github.io/)<sup>3</sup> <br>
