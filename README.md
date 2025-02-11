@@ -1,5 +1,6 @@
 # Value-Based Deep RL Scales Predictably
-### [Paper](https://arxiv.org/pdf/2502.04327)
+### [Paper](https://arxiv.org/pdf/2502.04327) <!--- TODO: add data link --->
+
 Implementation of a workflow for evaluating trade-offs between data efficiency,
 compute efficiency, and performance for online RL, validated across multiple
 environments.

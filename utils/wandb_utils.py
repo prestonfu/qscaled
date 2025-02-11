@@ -18,6 +18,8 @@ DUMMY_VALUE = 'None'
 
 
 class BaseRunCollector(abc.ABC):
+    """Base class for efficiently collecting run data from Wandb."""
+    
     def __init__(self, project: str):
         self.project = project
         self.data = defaultdict(list)
@@ -96,10 +98,9 @@ class BaseRunCollector(abc.ABC):
     def trim(self, num_seeds, verbose=False):
         """Trims the collector to only the best `num_seeds` runs for each key."""
         for key, summaries in self.data.items():
-            # summaries = [summary for summary in summaries if not summary.empty and 'episode/return' in summary.columns] # TODO: remove this line
             if len(summaries) > num_seeds:
                 final_train_returns = [(i, summary['episode/return'].mean()) for i, summary in enumerate(summaries)]
-                final_train_returns = sorted(final_train_returns, key=lambda x: -x[1])
+                final_train_returns = sorted(final_train_returns, key=lambda x: -x[1])  # Sort by descending returns
                 idx = [x[0] for x in final_train_returns]
                 self.data[key] = [summaries[idx[j]] for j in range(num_seeds)]
             elif len(summaries) < num_seeds and verbose:
@@ -241,7 +242,6 @@ class CRLRunCollector(BaseRunCollector):
     def remove_short(self, thresh=0.95):
         """Removes runs that are run for less than `thresh` times the length of the longest run"""
         for key, summaries in self.data.items():
-            # summaries = [summary for summary in summaries if not summary.empty] # TODO: remove this line
             step_counts = [summary['_step'].iloc[-1] for summary in summaries]
             max_step_count = max(step_counts)
             for i, step_count in reversed(list(enumerate(step_counts))):
