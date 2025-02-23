@@ -1,5 +1,5 @@
 # Value-Based Deep RL Scales Predictably
-### [Paper](https://arxiv.org/pdf/2502.04327) <!--- TODO: add data link --->
+### [Preprint](https://arxiv.org/abs/2502.04327)
 
 Implementation of a workflow for evaluating trade-offs between data efficiency,
 compute efficiency, and performance for online RL, validated across multiple
@@ -14,39 +14,41 @@ environments.
  [Aviral Kumar](https://aviralkumar2907.github.io/)<sup>3</sup> <br>
  <sup>1</sup>UC Berkeley, <sup>2</sup>University of Warsaw, <sup>3</sup>Carnegie Mellon University
 
-In submission.
-
-
 <img src='assets/scaling.png'/>
 
 ## Setup
 
 To setup a conda environment,
 ```
- conda env -create -f environment.yml
+conda create -n value-scaling python=3.10 -y
+conda activate value-scaling
+pip install -e .
 ```
 
 ## Running code
 
 ### Workflow
-* Run a hyperparameter grid search over UTD $\sigma$, batch size $B$, learning rate $\eta$.
-* Run [`analyze_grid_search.ipynb`](analyze_grid_search.ipynb). This produces fits 
-  $B^* (\sigma)$, $\eta^* (\sigma)$, as well as a baseline using the best $(B, \eta)$ 
-  setting for some $\sigma$ on each environment.
-* Run the proposed fit and the baseline.
-* Run [`analyze_fitted.ipynb`](analyze_fitted.ipynb).
+1. Run a hyperparameter grid search over UTD $\sigma$, batch size $B$, learning rate $\eta$, with logging to [Wandb](https://wandb.ai/).
+2. Run [`analyze_grid_search.ipynb`](analyze_grid_search.ipynb). This produces fits 
+   $B^* (\sigma)$, $\eta^* (\sigma)$, as well as a baseline using the best $(B, \eta)$ 
+   setting for some $\sigma$ on each environment.
+3. Run the proposed fit and the baseline.
+4. Run [`analyze_fitted.ipynb`](analyze_fitted.ipynb).
 
 ### Replicating paper results
 We have provided sample `zip` files containing run data fetched from Wandb in 
-[`cache/zip`](cache/zip). Running the aforementioned notebooks above will use those 
+[`data/zip`](data/zip). Running the aforementioned notebooks above will use those 
 zip` files by default.
 
 ## Citation
 ```
-@article{rybkin2025value,
-  title={Value-Based Deep RL Scales Predictably},
-  author={Rybkin, Oleh and Nauman, Michal and Fu, Preston and Snell, Charlie and Abbeel, Pieter and Levine, Sergey and Kumar, Aviral},
-  journal={arXiv preprint arXiv:2502.04327},
-  year={2025}
+@misc{rybkin2025valuebaseddeeprlscales,
+      title={Value-Based Deep RL Scales Predictably}, 
+      author={Oleh Rybkin and Michal Nauman and Preston Fu and Charlie Snell and Pieter Abbeel and Sergey Levine and Aviral Kumar},
+      year={2025},
+      eprint={2502.04327},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/2502.04327}, 
 }
 ```

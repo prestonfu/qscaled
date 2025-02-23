@@ -20,8 +20,9 @@ DUMMY_VALUE = 'None'
 class BaseRunCollector(abc.ABC):
     """Base class for efficiently collecting run data from Wandb."""
     
-    def __init__(self, project: str):
-        self.project = project
+    def __init__(self, wandb_entity: str, wandb_project: str):
+        self.entity = wandb_entity
+        self.project = wandb_project
         self.data = defaultdict(list)
         self._set_category_index()
         self._set_wandb_keys()
@@ -41,20 +42,29 @@ class BaseRunCollector(abc.ABC):
         raise NotImplementedError
     
     @abc.abstractmethod
-    def generate_key(self, run):
+    def _generate_key(self, run):
+        """Generates a key for a run."""
         raise NotImplementedError
     
-    @abc.abstractmethod
-    def insert(self, run):
-        raise NotImplementedError
-    
-    @abc.abstractmethod
-    def load_state(self, path):
-        raise NotImplementedError
+    def _insert(self, run, verbose=False):
+        """Inserts a Wandb run into the collector."""
+        if run.state != 'finished':
+            if verbose:
+                print(f'{run.name} skipped with status {run.state}')
+            return
 
-    @abc.abstractmethod
+        df = self.wandb_fetch(run)
+        if df is not None:
+            self.data[self._generate_key(run)].append(df)
+        elif verbose:
+            print(f'Failed to fetch {run.name} from Wandb')
+    
+    def load_state(self, path):
+        self.data.update(np.load(path, allow_pickle=True).item())
+
     def save_state(self, path):
-        raise NotImplementedError
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        np.save(path, self.data)  # pickle/gzip on the dictionary is very slow
 
     def sample(self):
         """Returns a sample key and value"""
@@ -130,14 +140,15 @@ class BaseRunCollector(abc.ABC):
         Creates a new RunCollector object.
         
         If `load == True` and `path` exists, load the state from `path`.
-        Otherwise, fetch all runs with tag in `tags` and insert them into the collector.
+        Otherwise, fetch all runs with tag in `tags` and _insert them into the collector.
         """
-        collector = self.__class__(self.project)
+        collector = self.__class__(self.entity, self.project)
         if load and os.path.exists(path):
             collector.load_state(path)
         else:
-            runs = api.runs(collector.project, {"tags": {"$in": tags}})
-            insert = lambda run: collector.insert(run)
+            runs = api.runs(f'{collector.entity}/{collector.project}', {"tags": {"$in": tags}})
+            runs = runs[:50]
+            insert = lambda run: collector._insert(run)
             if parallel:
                 with ThreadPool() as pool:
                     list(tqdm(pool.imap(insert, runs), total=len(runs)))
@@ -152,9 +163,9 @@ class BaseRunCollector(abc.ABC):
         Updates tags of all runs with tags in `tags` that pass the (args, kw) filter
         by adding `new_tag`.
         """
-        runs = api.runs(self.project, {"tags": {"$in": tags}})
+        runs = api.runs(f'{self.project}/{self.entity}', {"tags": {"$in": tags}})
         def update(run):
-            if self._check_key(self.generate_key(run), *args, **kw):
+            if self._check_key(self._generate_key(run), *args, **kw):
                 if new_tag not in run.tags:
                     run.tags.append(new_tag)
                     run.update()
@@ -169,11 +180,10 @@ class BaseRunCollector(abc.ABC):
 class CRLRunCollector(BaseRunCollector):
     """An example RunCollector implementation."""
     
-    def __init__(self, project: str):
-        super().__init__(project)
+    def __init__(self, wandb_entity: str, wandb_project: str):
+        super().__init__(wandb_entity, wandb_project)
         
     def _set_category_index(self):
-        """Specifies categories and their order."""
         self.categories = ['env', 'utd', 'batch_size', 'learning_rate']
         self.num_categories = len(self.categories)
         self.category_index = {cat: i for i, cat in enumerate(self.categories)}
@@ -190,33 +200,19 @@ class CRLRunCollector(BaseRunCollector):
             'training/critic_gnorm_l2',
         ]
         
-    def generate_key(self, run):
+    def _generate_key(self, run):
         env = run.config["env_name"]
         utd = run.config["utd_ratio"]
         batch_size = run.config["batch_size"]
         learning_rate = run.config["agent.critic_lr"]
         key = (env, utd, batch_size, learning_rate)  # key is given in same order as `self.categories`
-        return key
-        
-    def insert(self, run, verbose=False):
-        if run.state != 'finished' and verbose:
-            print(f'{run.name} skipped with status {run.state}')
-            return       
-
-        df = self.wandb_fetch(run)
-        if df is None and verbose:
-            print(f'Failed to fetch {run.name} from Wandb')
-        else:
-            self.data[self.generate_key(run)].append(df)
-    
-    def load_state(self, path):
-        self.data.update(np.load(path, allow_pickle=True).item())
-
-    def save_state(self, path):
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        np.save(path, self.data)  # pickle/gzip on the dictionary is very slow
+        return key            
 
     def get_all(self, metric, *args, **kw):
+        """
+        Returns a dictionary where keys are those of `self.data` and values
+        are list of dataframes containing the step and metric.
+        """
         res_dict = defaultdict(list)
         for key, summaries in self.filter(*args, **kw).items():
             for summary in summaries:
@@ -240,10 +236,35 @@ class CRLRunCollector(BaseRunCollector):
         return res_dict
         
     def remove_short(self, thresh=0.95):
-        """Removes runs that are run for less than `thresh` times the length of the longest run"""
+        """
+        Removes runs that are run for less than fracion `thresh` of the 
+        length of the longest run.
+        """
         for key, summaries in self.data.items():
             step_counts = [summary['_step'].iloc[-1] for summary in summaries]
             max_step_count = max(step_counts)
             for i, step_count in reversed(list(enumerate(step_counts))):
                 if step_count < thresh * max_step_count:
                     summaries.pop(i)
+
+
+class MyRunCollector(BaseRunCollector):
+    """See `CRLRunCollector` for an example implementation."""
+    
+    def __init__(self, wandb_entity: str, wandb_project: str):
+        super().__init__(wandb_entity, wandb_project)
+    
+    def _set_category_index(self):
+        """
+        TODO: If you'd like to reproduce the same behavior as in our method,
+        you can copy the implementation from `CRLRunCollector`.
+        """
+        raise NotImplementedError
+        
+    def _set_wandb_keys(self):
+        """TODO: All of the wandb keys you might ever be interested in."""
+        raise NotImplementedError
+        
+    def _generate_key(self, run):
+        """TODO: Identify a run by its configuration, with the same order as `self.categories`."""
+        raise NotImplementedError

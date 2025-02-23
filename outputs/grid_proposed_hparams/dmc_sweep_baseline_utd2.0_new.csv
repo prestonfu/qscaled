@@ -1,0 +1,22 @@
+Environment,UTD,Learning Rate,Batch Size
+cartpole-swingup,0.25,0.0006,512
+cartpole-swingup,0.5,0.0006,512
+cartpole-swingup,16,0.0006,512
+cheetah-run,0.25,0.0003,256
+cheetah-run,0.5,0.0003,256
+cheetah-run,16,0.0003,256
+dog-stand,0.25,0.0003,128
+dog-stand,0.5,0.0003,128
+dog-stand,16,0.0003,128
+finger-spin,0.25,0.012,512
+finger-spin,0.5,0.012,512
+finger-spin,16,0.012,512
+humanoid-stand,0.25,0.00015,512
+humanoid-stand,0.5,0.00015,512
+humanoid-stand,16,0.00015,512
+quadruped-walk,0.25,0.0006,128
+quadruped-walk,0.5,0.0006,128
+quadruped-walk,16,0.0006,128
+walker-walk,0.25,0.0006,512
+walker-walk,0.5,0.0006,512
+walker-walk,16,0.0006,512
