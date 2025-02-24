@@ -8,9 +8,9 @@ cheetah-run,16,0.0003,256
 dog-stand,0.25,0.0003,128
 dog-stand,0.5,0.0003,128
 dog-stand,16,0.0003,128
-finger-spin,0.25,0.012,512
-finger-spin,0.5,0.012,512
-finger-spin,16,0.012,512
+finger-spin,0.25,0.0012,512
+finger-spin,0.5,0.0012,512
+finger-spin,16,0.0012,512
 humanoid-stand,0.25,0.00015,512
 humanoid-stand,0.5,0.00015,512
 humanoid-stand,16,0.00015,512
