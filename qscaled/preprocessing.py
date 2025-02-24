@@ -29,14 +29,18 @@ class ZipLoader:
         """
         raise NotImplementedError('Implemented in subclasses')
     
-    def load(self, zip_path: str, manual_step=None) -> pd.DataFrame:
+    def load(self, zip_path: str, manual_step_freq=None, manual_step_start=None) -> pd.DataFrame:
         """
         Loads data from zip file to a DataFrame.
-        If `manual_step is None`, it will load the training steps as is.
-        Otherwise, it will 
+        
+        * If `manual_step is None`, it will load the training steps from the first
+          column of the data. 
+        * Otherwise, it uses manual_step_start + k * manual_step_freq
+          for k >= 0. 
         """
         records = []
-        
+        assert (manual_step_start is None) == (manual_step_freq is None), \
+            "Both or neither of manual_step_start and manual_step_freq should be provided."
         with ZipFile(zip_path, 'r') as zip_ref:
             for filename in zip_ref.namelist():
                 if filename.endswith('.npy'):
@@ -59,7 +63,9 @@ class ZipLoader:
                         'utd': utd,
                         'learning_rate': learning_rate,
                     }
-                    if manual_step is None:
+                    
+                    if manual_step_freq is None:
+                        # Take the first column as the step
                         record.update({
                             'training_step': arr[:, 0],
                             'return': arr[:, 1:],
@@ -67,8 +73,9 @@ class ZipLoader:
                             'std_return': np.std(arr[:, 1:], axis=1) / np.sqrt(arr.shape[1] - 1)  # standard error of mean over multiple seeds
                         })
                     else:
+                        # Use manual step
                         record.update({
-                            'training_step': np.arange(1, arr.shape[0] + 1) * manual_step,
+                            'training_step': np.arange(arr.shape[0]) * manual_step_freq + manual_step_start,
                             'return': arr,
                             'mean_return': np.mean(arr, axis=1),
                             'std_return': np.std(arr, axis=1) / np.sqrt(arr.shape[1])  # standard error of mean over multiple seeds
@@ -114,7 +121,8 @@ class FullGroupedLoaderUnlabeled(ZipLoader):
     Assumes the data corresponds to returns.
     Example: dmc_baseline/BRO_256_0.5_3e-4/cartpole-swingup.npy
     """
-    def __init__(self, max_returns):
+    def __init__(self, max_returns, return_key=None):
+        # return_key is intentionally not used
         super().__init__(max_returns, return_key=None)
     
     def parse_filename(self, filename):

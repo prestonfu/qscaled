@@ -11,8 +11,11 @@ from utils.wandb_utils import BaseRunCollector
 script_dir = os.path.dirname(os.path.abspath(__file__))
 cache_dir = os.path.join(script_dir, '../cache') 
 
-def replace_slashes(s: str):
+def replace_slashes(s: str | None):
+    if s is None:
+        return s
     return s.replace("/", ".")
+
 
 def save_and_load(config: Config):
     assert config.wandb_collector is not None or os.path.exists(f'{cache_dir}/zip/{config.name}.zip'), \
@@ -27,7 +30,8 @@ def save_and_load(config: Config):
             cwd=f'{cache_dir}/prezip',
         )
     zip_loader = config.zip_load_cls(config.max_returns, replace_slashes(config.return_key))
-    return zip_loader.load(f"{cache_dir}/zip/{config.name}.zip")
+    return zip_loader.load(f"{cache_dir}/zip/{config.name}.zip", config.env_step_freq, config.env_step_start)
+
 
 def get_data(collector: BaseRunCollector, env_name, varname, utd, logging_freq=None):
     """
