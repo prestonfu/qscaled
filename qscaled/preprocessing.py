@@ -83,15 +83,7 @@ class ZipLoader:
                     records.append(record)
                         
         
-        df = pd.DataFrame(records)
-        
-        envs = sorted(df['env_name'].unique().tolist())
-        utds = sorted(df['utd'].unique().tolist())
-        batch_sizes = sorted(df['batch_size'].unique().tolist())
-        learning_rates = sorted(df['learning_rate'].unique().tolist())
-        
-        return df, (envs, utds, batch_sizes, learning_rates)
-
+        return pd.DataFrame(records)
 
 class UTDGroupedLoader(ZipLoader):
     """
@@ -260,3 +252,15 @@ def select_middle_bs_lr(df):
 
     df = pd.DataFrame(filtered_rows)
     return df
+
+def get_envs(df):
+    return sorted(df['env_name'].unique().tolist())
+
+def get_utds(df):
+    return sorted(df['utd'].unique().tolist())
+
+def get_batch_sizes(df):
+    return sorted(df['batch_size'].unique().tolist())
+
+def get_learning_rates(df):
+    return sorted(df['learning_rate'].unique().tolist())
