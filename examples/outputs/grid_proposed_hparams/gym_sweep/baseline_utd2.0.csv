@@ -1,4 +1,4 @@
-Environment,UTD,Learning Rate,Batch Size,is_new
+Environment,UTD,Learning Rate,Batch Size,is_new_experiment
 Ant-v4,0.25,0.0001,256,True
 Ant-v4,0.5,0.0001,256,True
 Ant-v4,1,0.0001,256,False

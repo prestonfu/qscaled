@@ -5,9 +5,8 @@ import subprocess
 from functools import reduce
 from zipfile import ZipFile
 
-from qscaled import QSCALED_PATH
+from qscaled.constants import QSCALED_PATH
 from qscaled.utils.configs import BaseConfig
-from qscaled.wandb_utils.base_collector import BaseCollector
 
 np.random.seed(42)
 
@@ -15,7 +14,7 @@ np.random.seed(42)
 def replace_slash_with_period(s: str | None):
     if s is None:
         return s
-    return s.replace("/", ".")
+    return s.replace('/', '.')
 
 
 def fetch_zip_data(config: BaseConfig, use_cached=True) -> pd.DataFrame:
@@ -24,7 +23,7 @@ def fetch_zip_data(config: BaseConfig, use_cached=True) -> pd.DataFrame:
     Otherwise saves data to zip and returns it.
     """
     handler = ZipHandler(config)
-    
+
     if not use_cached or not os.path.exists(f'{handler._zip_path}/{handler._config.name}.zip'):
         collector = handler._config.wandb_collector
         assert collector is not None
@@ -39,8 +38,8 @@ class ZipHandler:
 
     def __init__(self, config: BaseConfig):
         self._config = config
-        self._prezip_path = f"{QSCALED_PATH}/prezip"
-        self._zip_path = f"{QSCALED_PATH}/zip"
+        self._prezip_path = f'{QSCALED_PATH}/prezip'
+        self._zip_path = f'{QSCALED_PATH}/zip'
 
     def save_prezip(self):
         """Saves offline returns data to prezip folder using wandb collector."""
@@ -52,14 +51,14 @@ class ZipHandler:
 
         for key, data in data_dict.items():
             env, utd, batch_size, learning_rate = key
-            filename = f"{self._config.name}/utd_{utd}/{env}/{save_returns_key}/bs_{batch_size}_lr_{learning_rate}.npy"
+            filename = f'{self._config.name}/utd_{utd}/{env}/{save_returns_key}/bs_{batch_size}_lr_{learning_rate}.npy'
             np.save(os.path.join(full_path, filename), data)
 
     def save_zip(self):
         """Saves prezip folder to zip."""
         os.makedirs(self._zip_path, exist_ok=True)
         subprocess.run(
-            f"zip -r {self._zip_path}/{self._config.name}.zip {self._config.name}",
+            f'zip -r {self._zip_path}/{self._config.name}.zip {self._config.name}',
             shell=True,
             check=True,
             cwd=os.dirname(self._prezip_path),
@@ -74,11 +73,11 @@ class ZipHandler:
         Example output:
           ('Ant-v4', 1.0, 128, 0.0001)
         """
-        _, utd_param, env_name, name, params = os.path.splitext(filename)[0].split("/")
+        _, utd_param, env_name, name, params = os.path.splitext(filename)[0].split('/')
         if name != replace_slash_with_period(self._config.returns_key):
             return None
-        utd = float(utd_param[len("utd_") :])
-        params = params.split("_")  # Example: ['bs', 128, 'lr', 0.0001]
+        utd = float(utd_param[len('utd_') :])
+        params = params.split('_')  # Example: ['bs', 128, 'lr', 0.0001]
         batch_size = int(params[1])
         learning_rate = float(params[3])
         return env_name, utd, batch_size, learning_rate
@@ -91,20 +90,22 @@ class ZipHandler:
           steps from the first column of the data.
         * Otherwise, it uses env_step_start + k * env_step_freq for k >= 0.
         """
-        assert (self._config.env_step_start is None) == (self._config.env_step_freq is None), \
-            "Both or neither of env_step_start and env_step_freq should be provided."
+        assert (self._config.env_step_start is None) == (self._config.env_step_freq is None), (
+            'Both or neither of env_step_start and env_step_freq should be provided.'
+        )
 
-        full_path = os.path.join(self._zip_path, f"{self._config.name}.zip")
+        full_path = os.path.join(self._zip_path, f'{self._config.name}.zip')
         records = []
 
-        with ZipFile(full_path, "r") as zip_ref:
+        with ZipFile(full_path, 'r') as zip_ref:
             for filename in zip_ref.namelist():
-                if filename.endswith(".npy") and not filename.startswith("__MACOSX"):
+                if filename.endswith('.npy') and not filename.startswith('__MACOSX'):
                     parsed_result = self.parse_filename(filename)
-                    if parsed_result is None: continue
+                    if parsed_result is None:
+                        continue
                     env_name, utd, batch_size, learning_rate = parsed_result
-                    
-                    with zip_ref.open(filename, "r") as f:
+
+                    with zip_ref.open(filename, 'r') as f:
                         arr = np.load(f)
                     if self._config.env_step_freq is None:
                         step_data = arr[:, 0]
@@ -118,14 +119,14 @@ class ZipHandler:
                         returns_data *= 1000 / self._config.max_returns[env_name]
 
                     record = {
-                        "env_name": env_name,
-                        "batch_size": batch_size,
-                        "utd": utd,
-                        "learning_rate": learning_rate,
-                        "training_step": step_data,
-                        "return": returns_data,
-                        "mean_return": np.mean(returns_data, axis=1),
-                        "std_return": np.std(returns_data, axis=1) / np.sqrt(returns_data.shape[1]),  # Standard error
+                        'env_name': env_name,
+                        'batch_size': batch_size,
+                        'utd': utd,
+                        'learning_rate': learning_rate,
+                        'training_step': step_data,
+                        'return': returns_data,
+                        'mean_return': np.mean(returns_data, axis=1),
+                        'std_return': np.std(returns_data, axis=1) / np.sqrt(returns_data.shape[1]),  # Standard error
                     }
                     records.append(record)
 

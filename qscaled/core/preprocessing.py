@@ -6,17 +6,17 @@ import pickle as pkl
 from tqdm import tqdm
 from sklearn.isotonic import IsotonicRegression
 
-from qscaled import QSCALED_PATH
+from qscaled.constants import QSCALED_PATH
 
 np.random.seed(42)
 
 
 def bootstrap_crossings(df, thresholds, filename: str):
     bootstrap_cache_file = os.path.join(QSCALED_PATH, 'bootstrap_results', f'{filename}.pkl')
-    
+
     # Isotonic regression
     iso_reg_results = []
-    
+
     for _, row in df.iterrows():
         ir = IsotonicRegression(out_of_bounds='clip')
         x = row['training_step']
@@ -34,20 +34,20 @@ def bootstrap_crossings(df, thresholds, filename: str):
             # Get crossing from isotonic regression
             crossing_idx = np.where(row['return_isotonic'] > threshold)[0]
             row_crossings.append(row['training_step'][crossing_idx[0]] if len(crossing_idx) > 0 else np.nan)
-        
+
         crossings_array.append(row_crossings)
 
     df['crossings'] = crossings_array
-    
+
     # Bootstrapping
     if os.path.exists(bootstrap_cache_file):
         with open(bootstrap_cache_file, 'rb') as f:
             results = pkl.load(f)
             iso_reg = results['iso_reg']
-            iso_reg_stds = results['iso_reg_stds'] 
+            iso_reg_stds = results['iso_reg_stds']
             crossings = results['crossings']
             crossings_std = results['crossings_std']
-    else:    
+    else:
         iso_reg = []
         iso_reg_stds = []
         crossings = []
@@ -62,7 +62,7 @@ def bootstrap_crossings(df, thresholds, filename: str):
                 # Sample with replacement
                 sample_indices = np.random.randint(0, row['return'].shape[1], size=row['return'].shape[1])
                 y = np.mean(row['return'][:, sample_indices], axis=1)  # Average the bootstrap samples
-                
+
                 # Fit isotonic regression on this bootstrap sample
                 ir.fit(x, y)
                 y_iso = ir.predict(x)
@@ -75,19 +75,19 @@ def bootstrap_crossings(df, thresholds, filename: str):
                     crossing = row['training_step'][crossing_idx[0]] if len(crossing_idx) > 0 else np.nan
                     sample_crossing.append(crossing)
                 sample_crossings.append(sample_crossing)
-            
+
             # Store mean prediction, crossing statistics, and isotonic std
             iso_reg.append(y_iso_samples)
             crossings.append(np.array(sample_crossings))
             crossings_std.append(np.nanstd(sample_crossings, axis=0))
             iso_reg_stds.append(np.std(y_iso_samples, axis=0))
-            
+
         # Save results to cache
         results = {
             'iso_reg': iso_reg,
             'iso_reg_stds': iso_reg_stds,
-            'crossings': crossings, 
-            'crossings_std': crossings_std
+            'crossings': crossings,
+            'crossings_std': crossings_std,
         }
         os.makedirs(os.path.dirname(bootstrap_cache_file), exist_ok=True)
         with open(bootstrap_cache_file, 'wb') as f:
@@ -99,8 +99,8 @@ def bootstrap_crossings(df, thresholds, filename: str):
     df['return_isotonic_std'] = iso_reg_stds
 
     mean_std = np.nanmean(np.array(crossings_std))
-    print(f"Average standard deviation across all conditions: {mean_std:.2f}")
-    
+    print(f'Average standard deviation across all conditions: {mean_std:.2f}')
+
     return df
 
 
@@ -120,34 +120,35 @@ def select_middle_bs_lr(df):
     filtered_rows = []
     for env in envs:
         env_data = df[df['env_name'] == env]
-        
+
         for utd in utds:
             utd_data = env_data[env_data['utd'] == utd]
             if len(utd_data) > 0:
                 lrs = sorted(utd_data['learning_rate'].unique())
-                mid_lr = lrs[len(lrs)//2]
+                mid_lr = lrs[len(lrs) // 2]
                 batch_sizes = sorted(utd_data['batch_size'].unique())
-                mid_bs = batch_sizes[len(batch_sizes)//2]
-                
-                row = utd_data[
-                    (utd_data['learning_rate'] == mid_lr) & 
-                    (utd_data['batch_size'] == mid_bs)
-                ]
-                
+                mid_bs = batch_sizes[len(batch_sizes) // 2]
+
+                row = utd_data[(utd_data['learning_rate'] == mid_lr) & (utd_data['batch_size'] == mid_bs)]
+
                 if len(row) > 0:
                     filtered_rows.append(row.iloc[0])
 
     df = pd.DataFrame(filtered_rows)
     return df
 
+
 def get_envs(df):
     return sorted(df['env_name'].unique().tolist())
+
 
 def get_utds(df):
     return sorted(df['utd'].unique().tolist())
 
+
 def get_batch_sizes(df):
     return sorted(df['batch_size'].unique().tolist())
+
 
 def get_learning_rates(df):
     return sorted(df['learning_rate'].unique().tolist())

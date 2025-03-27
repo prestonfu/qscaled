@@ -1,4 +1,3 @@
-import os
 import numpy as np
 import pandas as pd
 
@@ -10,12 +9,10 @@ from qscaled.core.grid_search.bootstrap_envsteps_to_thresh import (
     compute_bootstrap_averages,
 )
 from qscaled.core.grid_search.linear_fit import linear_fit_separate, linear_fit_shared
-from qscaled.core.save_params import tabulate_proposed_params, tabulate_baseline_params
-from qscaled.wandb_utils.one_seed_per_run import ExampleOneSeedPerRunCollector
-from qscaled.utils.zip_handler import fetch_zip_data
 from qscaled.utils.configs import SweepConfig
 
 np.random.seed(42)
+
 
 def main():
     """
@@ -24,14 +21,14 @@ def main():
     2. Fill in `MyCollector` in qscaled/wandb_utils.
     3. Update the information in `SweepConfig` below.
 
-    The latter two steps take ~5 minutes!
+    The latter two steps take ~10 minutes!
 
     If you set `wandb_collect == True`, your `zip` file will be rebuilt using your
     Wandb collector. Otherwise, the `zip` file must be present.
     """
     wandb_collect = False
     wandb_collector = None  # Zip data was collected separately.
-    name = "dmc_sweep"
+    name = 'dmc_sweep'
 
     # Maximum possible returns (estimated with infinite data and compute) on each
     # environment. These are mostly eyeballed such that runs reach 80% (hence
@@ -54,11 +51,7 @@ def main():
     # Bootstrapping and Fitting
     best_lr = grid_best_uncertainty_lr(grid_search_df)
     best_bs = grid_best_uncertainty_bs(grid_search_df)
-    best_lr_bs = (
-        best_lr.groupby(["env_name", "utd"])
-        .apply(get_bootstrap_optimal, include_groups=False)
-        .reset_index()
-    )
+    best_lr_bs = best_lr.groupby(['env_name', 'utd']).apply(get_bootstrap_optimal, include_groups=False).reset_index()
     best_lr_bs = compute_bootstrap_averages(best_lr, best_bs, best_lr_bs)
 
     # Empirically, we find that using a shared slope does better.
@@ -73,7 +66,7 @@ def main():
         config.utds_to_predict,
         grid_search_df,
         best_lr_bs,
-        outputs_dir="../outputs",
+        outputs_dir='../outputs',
         save_path=None,
         plot=False,
     )
@@ -89,17 +82,17 @@ def main():
         config.utds_to_predict,
         grid_search_df,
         best_lr_bs,
-        outputs_dir="../outputs",
+        outputs_dir='../outputs',
         save_path=name,
         plot=False,
     )
 
-    pd.options.display.float_format = "{:.2e}".format
+    pd.options.display.float_format = '{:.2e}'.format
     proposed_values_df = tabulate_proposed_params(
         config.utds_to_predict,
         proposed_lr_values_shared,
         proposed_bs_values_shared,
-        outputs_dir="../outputs",
+        outputs_dir='../outputs',
         save_path=name,
         verbose=True,
     )
@@ -108,9 +101,10 @@ def main():
         config.utds_to_predict,
         utd=2,
         df=grid_search_df,
-        outputs_dir="../outputs",
+        outputs_dir='../outputs',
         save_path=name,
     )
 
-if __name__ == "__main__":
+
+if __name__ == '__main__':
     main()
