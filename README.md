@@ -16,14 +16,13 @@ environments.
 
 <img src='assets/scaling.png'/>
 
-## Setup
+## Installation
 
-To setup a conda environment,
 ```
-conda create -n value-scaling python=3.10 -y
-conda activate value-scaling
 pip install -e .
 ```
+
+It requires Python 3.10+.
 
 ## Running code
 

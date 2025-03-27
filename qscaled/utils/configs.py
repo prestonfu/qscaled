@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from typing import ClassVar, Dict, List, Type, Optional
 
-from qscaled.utils.load_from_zip import ZipLoader, DefaultZipLoader
 from qscaled.wandb_utils.base_collector import BaseCollector
 
 
@@ -9,10 +8,9 @@ from qscaled.wandb_utils.base_collector import BaseCollector
 class BaseConfig:
     name: str  # Name of the experiment, used for filenames
     max_returns: Dict[str, float]  # Maximum returns per environment
-    return_key: str  # Logging key for episode returns
+    returns_key: str  # Logging key for offline returns
     thresholds: ClassVar[List[int]] = [100, 200, 300, 400, 500, 600, 700, 800]  # Return thresholds out of 1000
     wandb_collector: Optional[BaseCollector] = None  # Wandb run collector; None if loading from zip directly
-    zip_load_cls: Type[ZipLoader] = DefaultZipLoader  # Default zip loading class
     env_step_freq: Optional[int] = None  # Takes Wandb data every n steps
     env_step_start: Optional[int] = None  # Takes Wandb data starting from this step
 

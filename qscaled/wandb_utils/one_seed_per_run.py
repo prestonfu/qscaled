@@ -25,36 +25,25 @@ class OneSeedPerRunCollector(BaseCollector):
                 if step_count < thresh * max_step_count:
                     rundatas.pop(i)
 
-    def prepare_zip_export_data(self, metric, logging_freq=None) -> Dict[Any, pd.DataFrame]:
+    def prepare_zip_export_data(self, metric, logging_freq=None) -> Dict[Any, np.typing.NDArray]:
         """Prepares data to export in a format compatible with UTDGroupedLoader."""
+        merge_fn = lambda l, r: pd.merge(l, r, on='_step', how='outer')
         
         for env in self.get_unique('env'):
             for utd in self.get_unique('utd', env=env):
                 filtered_rundatas = self.get_filtered_rundatas(env=env, utd=utd)
                 data_dict = {}
-                merge_fn = lambda l, r: pd.merge(l, r, on='_step', how='outer')
                 
                 for key, rundatas in filtered_rundatas.items():
                     bs = key[self._hparam_index['batch_size']]
                     lr = key[self._hparam_index['learning_rate']]
-                    save_key = (env, utd, bs, lr)
                     summaries = [
                         df[['_step', metric]].rename(columns={metric: f'seed{i}/{metric}'})
                         for i, df in enumerate(rundatas)
                     ]
                     merged_df = reduce(merge_fn, summaries)
-                    
-                    # Resolve non-uniform logging frequencies bugs
-                    if logging_freq:
-                        merged_df['rounded_step'] = np.ceil(merged_df['_step'] / logging_freq) * logging_freq
-                        agg_dict = {
-                            '_step': 'first', 
-                            **{col: 'mean' for col in merged_df.columns if col.startswith('seed')}
-                        }
-                        result_df = merged_df.groupby('rounded_step').agg(agg_dict).dropna().reset_index(drop=True)
-                    else:
-                        result_df = merged_df
-                    
+                    result_df = self._resolve_logging_freq(merged_df, logging_freq) if logging_freq else merged_df                    
+                    save_key = (env, utd, bs, lr)
                     data_dict[save_key] = result_df.to_numpy()
         
         return data_dict
@@ -72,7 +61,7 @@ class ExampleOneSeedPerRunCollector(OneSeedPerRunCollector):
             'training/critic_pnorm_l2',
             'training/critic_gnorm_l2',
         ]
-        
+
     def _generate_key(self, run):
         config_dict = flatten_dict(run.config)
         env = config_dict["env_name"]
@@ -81,7 +70,7 @@ class ExampleOneSeedPerRunCollector(OneSeedPerRunCollector):
         learning_rate = config_dict["agent.critic_lr"]
         key = (env, utd, batch_size, learning_rate)  # key is given in same order as `self._hparams`
         return key
-                    
+
     def wandb_fetch(self, run, num_tries=5) -> Tuple[Dict[str, Any], pd.DataFrame]:
         @retry(num_tries)
         def helper(config):

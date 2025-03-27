@@ -27,7 +27,7 @@ class BaseCollector(abc.ABC):
                  wandb_entity: str, 
                  wandb_project: str,
                  wandb_tags: List[str] | str = [],
-                 load: bool = True,
+                 use_cache: bool = True,
                  parallel: bool = True):
         """
         Creates a new BaseCollector object.
@@ -35,8 +35,8 @@ class BaseCollector(abc.ABC):
         Args:
         * `wandb_tags`: List of wandb tags to filter runs by. If empty list, all 
           runs are collected from wandb. If `None`, no runs are collected.
-        * `load`: If true, loads pre-existing data from memory. Otherwise, fetches
-          data from wandb.
+        * `use_cache`: If true, loads pre-existing data from memory. Otherwise, 
+          fetches data from wandb.
         * `parallel`: If true, fetches data from wandb in parallel.
         
         The data are stored in two dictionaries, `_metadatas` and `_rundatas`.
@@ -54,7 +54,7 @@ class BaseCollector(abc.ABC):
         self._set_hparams()
         self._set_wandb_metrics()
         if wandb_tags is not None:
-            self._fetch_data(wandb_tags, load, parallel)
+            self._fetch_data(wandb_tags, use_cache, parallel)
 
     @abc.abstractmethod
     def _set_hparams(self):
@@ -85,13 +85,13 @@ class BaseCollector(abc.ABC):
         raise NotImplementedError
     
     @abc.abstractmethod
-    def prepare_zip_export_data(self, varname, logging_freq=None) -> Dict[Any, pd.DataFrame]:
+    def prepare_zip_export_data(self, metric, logging_freq=None) -> Dict[Any, np.typing.NDArray]:
         """
-        Prepares output for `ZipLoader`. Returns a dictionary mapping 
+        Prepares output for `ZipHandler`. Returns a dictionary mapping 
         collector keys to a single `pd.DataFrame`, filtered on the given env 
         and utd.
         
-        If `logging_freq is not None`, it will round the step to the nearest 
+        If `logging_freq is not None`, it will round the step up to the nearest 
         multiple of `logging_freq`.
         """
         raise NotImplementedError
@@ -265,13 +265,13 @@ class BaseCollector(abc.ABC):
                 collector._rundatas[key].extend(other._rundatas[key])
         return collector
 
-    def _fetch_data(self, wandb_tags: List[str] | str = [], load: bool = True, 
+    def _fetch_data(self, wandb_tags: List[str] | str = [], use_cache: bool = True, 
                     parallel: bool = True, verbose: bool = False):
         """
         Args:
         * `wandb_tags`: List of wandb tags to filter runs by. If empty, all runs 
           are collected from wandb.
-        * `load`: If true, loads pre-existing data from memory. Otherwise, fetches
+        * `use_cache`: If true, loads pre-existing data from memory. Otherwise, fetches
           data from wandb.
         * `parallel`: If true, fetches data from wandb in parallel with half the
           number of cores.
@@ -288,7 +288,7 @@ class BaseCollector(abc.ABC):
         for tag in wandb_tags:
             collector = collector_factory()
                         
-            if load and os.path.exists(os.path.join(self._path, tag + ".npy")):
+            if use_cache and os.path.exists(os.path.join(self._path, tag + ".npy")):
                 collector.load_state(tag)
             else:
                 wandb_str = f'{self._wandb_entity}/{self._wandb_project}'
@@ -314,3 +314,18 @@ class BaseCollector(abc.ABC):
         
         combined_collector = self.__class__.merge(*collectors)
         self.copy_state(combined_collector)
+                    
+    def _resolve_logging_freq(self, df: pd.DataFrame, logging_freq):
+        """
+        Resolves non-uniform logging frequencies. Rounds step up to nearest 
+        multiple of `logging_freq`, then averages over potential duplicates.
+        Since performance is usually increasing, in general the output
+        will be more conservative than the input.
+        """
+        df = df.copy()
+        df['rounded_step'] = np.ceil(df['_step'] / logging_freq) * logging_freq
+        agg_dict = {
+            '_step': 'first', 
+            **{col: 'mean' for col in df.columns if col.startswith('seed')}
+        }
+        return df.groupby('rounded_step').agg(agg_dict).dropna().reset_index(drop=True)
