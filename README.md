@@ -74,7 +74,7 @@ and learning rate $\eta^\* (\sigma)$.
    [`ExampleOneSeedPerRunCollector`](qscaled/wandb_utils/one_seed_per_run.py)
    and [`ExampleMultipleSeedsPerRunCollector`](qscaled/wandb_utils/multiple_seeds_per_run.py), 
    respectively.
-3. Make a copy of [`gym_explore`](experiments/1_grid_search/gym_explore.py).
+3. Make a copy of a notebook in [`experiments/1_grid_search`](experiments/1_grid_search).
 4. Label your Wandb runs with tags (or, if you don't have many runs,
    skip this step and leave `wandb_tags` as `[]`). You can add tags by 
    selecting runs in the Wandb UI and clicking "Tag".
