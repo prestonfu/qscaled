@@ -1,4 +1,5 @@
 import os
+import warnings
 import numpy as np
 import pandas as pd
 import pickle as pkl
@@ -47,6 +48,24 @@ def bootstrap_crossings(df, thresholds, filename: str, use_cached=True):
             crossings = results['crossings']
             crossings_std = results['crossings_std']
     else:
+
+        def _compute_nanstd(sample_crossings):
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter('always', category=RuntimeWarning)  # Catch all RuntimeWarnings
+                crossings_std = np.nanstd(sample_crossings, axis=0)
+                for warning in w:
+                    if 'Degrees of freedom <= 0 for slice' in str(warning.message):
+                        warnings.warn(
+                            'It is probable that some environments do not reach every performance threshold '
+                            'for every UTD. This can cause the standard deviation to be zero. '
+                            'Consider decreasing your thresholds in the config, and call `bootstrap_crossings` '
+                            'with `use_cached=False`.',
+                            UserWarning,
+                        )
+                    print(warning.message)
+
+                return crossings_std
+
         iso_reg = []
         iso_reg_stds = []
         crossings = []
@@ -78,7 +97,7 @@ def bootstrap_crossings(df, thresholds, filename: str, use_cached=True):
             # Store mean prediction, crossing statistics, and isotonic std
             iso_reg.append(y_iso_samples)
             crossings.append(np.array(sample_crossings))
-            crossings_std.append(np.nanstd(sample_crossings, axis=0))
+            crossings_std.append(_compute_nanstd(sample_crossings))
             iso_reg_stds.append(np.std(y_iso_samples, axis=0))
 
         # Save results to cache

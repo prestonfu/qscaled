@@ -1,22 +1,28 @@
-import numpy as np
 import matplotlib.pyplot as plt
 
+from qscaled.core.preprocessing import get_envs, get_utds
 
-def plot_per_env_utd(ours_df, baseline_df, envs, n_utds, n_envs):
-    fig, axs = plt.subplots(n_utds, n_envs, figsize=(3.5 * n_envs, 2.5 * n_utds))
+
+def plot_per_env_utd(ours_df, baseline_df, thresholds):
+    envs = get_envs(ours_df)
+    utds = get_utds(ours_df)
+    n_envs = len(envs)
+    n_utds = len(utds)
+
+    fig, axes = plt.subplots(n_utds, n_envs, figsize=(3.5 * n_envs, 2.5 * n_utds))
     fig.suptitle('Learning Curves by Environment and UTD Ratio')
 
-    def helper(axs, df, label, color):
-        # Group data by environment and UTD ratio
+    def helper(axes, df, label, color):
         for i, env in enumerate(envs):
-            env_data = df[df['env_name'] == env]
-            for j, utd in enumerate(sorted(env_data['utd'].unique())):
-                utd_data = env_data[env_data['utd'] == utd]
+            for j, utd in enumerate(utds):
+                subset = df[(df['env_name'] == env) & (df['utd'] == utd)]
+                if subset.empty:
+                    continue
 
-                ax = axs[j, i]
+                ax = axes[j, i]
                 ax.set_title(f'{env} (UTD={utd})')
 
-                for _, row in utd_data.iterrows():
+                for _, row in subset.iterrows():
                     # ax_label = f"{label}: bs={row['batch_size']}, lr={row['learning_rate']}"
                     ax.plot(row['training_step'], row['mean_return'], color=color, alpha=0.3)
                     ax.plot(row['training_step'], row['return_isotonic'], color=color, alpha=1, label=label)
@@ -40,7 +46,7 @@ def plot_per_env_utd(ours_df, baseline_df, envs, n_utds, n_envs):
                 ax.set_facecolor('#f0f0f0')
                 ax.legend()
 
-    helper(axs, ours_df, 'Ours', 'tab:blue')
-    helper(axs, baseline_df, 'Baseline', 'tab:orange')
+    helper(axes, ours_df, 'Ours', 'tab:blue')
+    helper(axes, baseline_df, 'Baseline', 'tab:orange')
     plt.tight_layout()
     plt.show()

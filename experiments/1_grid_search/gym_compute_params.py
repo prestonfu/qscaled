@@ -9,7 +9,7 @@ check:
 for further details.
 """
 
-from compute_params import compute_params
+from qscaled.scripts.compute_params import compute_params
 from qscaled.wandb_utils.one_seed_per_run import ExampleOneSeedPerRunCollector
 from qscaled.utils.configs import SweepConfig
 
@@ -34,6 +34,7 @@ config = SweepConfig(
     returns_key='episode/return',
     utds_to_predict=[0.25, 0.5, 1, 2, 4, 8, 16, 32, 64, 128, 256],
     wandb_collector=wandb_collector,
+    baseline_utd_at=2,
 )
 
-compute_params(config)
+compute_params(config, '../outputs')

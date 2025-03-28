@@ -6,6 +6,10 @@ cartpole-swingup,2,0.0006,512,False
 cartpole-swingup,4,0.0006,512,False
 cartpole-swingup,8,0.0006,512,False
 cartpole-swingup,16,0.0006,512,True
+cartpole-swingup,32,0.0006,512,True
+cartpole-swingup,64,0.0006,512,True
+cartpole-swingup,128,0.0006,512,True
+cartpole-swingup,256,0.0006,512,True
 cheetah-run,0.25,0.0003,256,True
 cheetah-run,0.5,0.0003,256,True
 cheetah-run,1,0.0003,256,False
@@ -13,6 +17,10 @@ cheetah-run,2,0.0003,256,False
 cheetah-run,4,0.0003,256,False
 cheetah-run,8,0.0003,256,False
 cheetah-run,16,0.0003,256,True
+cheetah-run,32,0.0003,256,True
+cheetah-run,64,0.0003,256,True
+cheetah-run,128,0.0003,256,True
+cheetah-run,256,0.0003,256,True
 dog-stand,0.25,0.0003,128,True
 dog-stand,0.5,0.0003,128,True
 dog-stand,1,0.0003,128,False
@@ -20,6 +28,10 @@ dog-stand,2,0.0003,128,False
 dog-stand,4,0.0003,128,False
 dog-stand,8,0.0003,128,False
 dog-stand,16,0.0003,128,True
+dog-stand,32,0.0003,128,True
+dog-stand,64,0.0003,128,True
+dog-stand,128,0.0003,128,True
+dog-stand,256,0.0003,128,True
 finger-spin,0.25,0.0012,512,True
 finger-spin,0.5,0.0012,512,True
 finger-spin,1,0.0012,512,False
@@ -27,6 +39,10 @@ finger-spin,2,0.0012,512,False
 finger-spin,4,0.0012,512,False
 finger-spin,8,0.0012,512,False
 finger-spin,16,0.0012,512,True
+finger-spin,32,0.0012,512,True
+finger-spin,64,0.0012,512,True
+finger-spin,128,0.0012,512,True
+finger-spin,256,0.0012,512,True
 humanoid-stand,0.25,0.00015,512,True
 humanoid-stand,0.5,0.00015,512,True
 humanoid-stand,1,0.00015,512,False
@@ -34,6 +50,10 @@ humanoid-stand,2,0.00015,512,False
 humanoid-stand,4,0.00015,512,False
 humanoid-stand,8,0.00015,512,False
 humanoid-stand,16,0.00015,512,True
+humanoid-stand,32,0.00015,512,True
+humanoid-stand,64,0.00015,512,True
+humanoid-stand,128,0.00015,512,True
+humanoid-stand,256,0.00015,512,True
 quadruped-walk,0.25,0.0006,128,True
 quadruped-walk,0.5,0.0006,128,True
 quadruped-walk,1,0.0006,128,False
@@ -41,6 +61,10 @@ quadruped-walk,2,0.0006,128,False
 quadruped-walk,4,0.0006,128,False
 quadruped-walk,8,0.0006,128,False
 quadruped-walk,16,0.0006,128,True
+quadruped-walk,32,0.0006,128,True
+quadruped-walk,64,0.0006,128,True
+quadruped-walk,128,0.0006,128,True
+quadruped-walk,256,0.0006,128,True
 walker-walk,0.25,0.0006,512,True
 walker-walk,0.5,0.0006,512,True
 walker-walk,1,0.0006,512,False
@@ -48,3 +72,7 @@ walker-walk,2,0.0006,512,False
 walker-walk,4,0.0006,512,False
 walker-walk,8,0.0006,512,False
 walker-walk,16,0.0006,512,True
+walker-walk,32,0.0006,512,True
+walker-walk,64,0.0006,512,True
+walker-walk,128,0.0006,512,True
+walker-walk,256,0.0006,512,True

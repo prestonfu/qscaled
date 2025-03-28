@@ -1,4 +1,3 @@
-import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -35,7 +34,7 @@ def _plot_per_lr_or_bs(df, thresholds, group_name):
 
     for group_value in group_values:
         colors = sns.color_palette('viridis', n_colors=len(param_values))
-        fig, axs = plt.subplots(n_utds, n_envs, figsize=(3.5 * n_envs, 2.5 * n_utds))
+        fig, axes = plt.subplots(n_utds, n_envs, figsize=(3.5 * n_envs, 2.5 * n_utds))
         fig.suptitle(f'Learning Curves by Environment and UTD Ratio ({description} = {group_value})')
 
         lines = []
@@ -56,7 +55,7 @@ def _plot_per_lr_or_bs(df, thresholds, group_name):
                 # Sort by learning rate only since we're already filtering by UTD
                 utd_data = utd_data.sort_values(param_key)
 
-                ax = axs[j, i]
+                ax = axes[j, i]
                 ax.set_title(f'{env} (UTD={utd})')
 
                 for _, row in utd_data.iterrows():

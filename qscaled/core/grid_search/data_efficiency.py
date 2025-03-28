@@ -1,9 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
 
-from qscaled.core.preprocessing import get_envs, get_utds, get_batch_sizes, get_learning_rates
-from qscaled.core.fitted.fitting import fit_powerlaw, power_law_with_const
+from qscaled.core.preprocessing import get_envs, get_utds
+from qscaled.utils.power_law import fit_powerlaw, power_law_with_const
 
 
 def plot_closest_data_efficiency(df_grid, proposed_hparams):
@@ -42,7 +41,7 @@ def plot_closest_data_efficiency(df_grid, proposed_hparams):
                 env_data.append((utd, df_grid.loc[closest_match, 'crossings'][-1]))
 
         closest_data_efficiency_dict[env] = env_data
-        
+
         if len(env_data) > 0:
             utds, times = zip(*env_data)
             axes[i].plot(utds, times, 'o-')
@@ -70,7 +69,9 @@ def plot_averaged_data_efficiency(closest_data_efficiency_dict):
     """
     plt.figure(figsize=(9, 6))
 
-    median_times = np.array([np.median(list(zip(*data))[1]) for data in closest_data_efficiency_dict.values() if len(data) > 0])
+    median_times = np.array(
+        [np.median(list(zip(*data))[1]) for data in closest_data_efficiency_dict.values() if len(data) > 0]
+    )
     scaling = 1 / median_times
 
     # Store the normalized data for each environment

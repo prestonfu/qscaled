@@ -1,9 +1,8 @@
-import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from qscaled.core.preprocessing import get_envs, get_utds, get_batch_sizes, get_learning_rates
+from qscaled.core.preprocessing import get_envs
 
 
 def _grid_best_uncertainty(df, param_name, print_pivot=False):
@@ -230,7 +229,7 @@ def plot_bootstrap_average_params(df_best_lr_bs):
     def helper(optim_key, other_key, title):
         fig, axes = plt.subplots(n_rows, n_cols, figsize=(4.5 * n_cols, 4 * n_rows), sharey=True)
         axes = axes.flatten()
-        
+
         for i, env in enumerate(envs):
             env_data = df_best_lr_bs[df_best_lr_bs['env_name'] == env]
 
@@ -244,7 +243,9 @@ def plot_bootstrap_average_params(df_best_lr_bs):
             )
 
             # Add bootstrapped confidence intervals
-            bootstrap_corr = np.corrcoef(np.log10(env_data['utd']), np.log10(env_data[f'best_{optim_key}_bootstrap_mean']))[0, 1]
+            bootstrap_corr = np.corrcoef(
+                np.log10(env_data['utd']), np.log10(env_data[f'best_{optim_key}_bootstrap_mean'])
+            )[0, 1]
             axes[i].errorbar(
                 env_data['utd'],
                 env_data[f'best_{optim_key}_bootstrap_mean'],
@@ -254,7 +255,9 @@ def plot_bootstrap_average_params(df_best_lr_bs):
             )
 
             # Add mean optimal learning rate
-            mean_corr = np.corrcoef(np.log10(env_data['utd']), np.log10(env_data[f'best_{optim_key}_{other_key}mean']))[0, 1]
+            mean_corr = np.corrcoef(np.log10(env_data['utd']), np.log10(env_data[f'best_{optim_key}_{other_key}mean']))[
+                0, 1
+            ]
             axes[i].errorbar(
                 env_data['utd'],
                 env_data[f'best_{optim_key}_{other_key}mean'],
@@ -264,7 +267,9 @@ def plot_bootstrap_average_params(df_best_lr_bs):
             )
 
             # Add mean learning rate averaged across batch sizes and bootstrap intervals
-            mean_bootstrap_corr = np.corrcoef(np.log10(env_data['utd']), np.log10(env_data[f'best_{optim_key}_bootstrap_{other_key}mean']))[0, 1]
+            mean_bootstrap_corr = np.corrcoef(
+                np.log10(env_data['utd']), np.log10(env_data[f'best_{optim_key}_bootstrap_{other_key}mean'])
+            )[0, 1]
             axes[i].errorbar(
                 env_data['utd'],
                 env_data[f'best_{optim_key}_bootstrap_{other_key}mean'],
@@ -285,6 +290,6 @@ def plot_bootstrap_average_params(df_best_lr_bs):
         plt.suptitle(title, size=16)
         plt.tight_layout()
         plt.show()
-        
+
     helper('lr', 'bs', r'$\eta^*$: Learning rate')
     helper('bs', 'lr', r'$B^*$: Best batch size')

@@ -2,7 +2,6 @@ import os
 import numpy as np
 import pandas as pd
 import subprocess
-from functools import reduce
 from zipfile import ZipFile
 
 from qscaled.constants import QSCALED_PATH
@@ -129,7 +128,7 @@ class ZipHandler:
                         'std_return': np.std(returns_data, axis=1) / np.sqrt(returns_data.shape[1]),  # Standard error
                     }
                     records.append(record)
-        
+
         if len(records) == 0:
             raise ValueError('No data found in zip file.')
         return pd.DataFrame(records)

@@ -73,8 +73,10 @@ and learning rate $\eta^\* (\sigma)$.
 
 This procedure takes ~10 minutes!
 
+Running the notebook will produce outputs in [`experiments/outputs`](experiments/outputs).
 
-## Actually, I just want your hyperparameters
+
+## Actually, I just want your hyperparameters.
 
 See `experiments/outputs/grid_proposed_hparams`. 
 * `shared` (**recommended**): Our batch size $B^\*(\sigma)$ and learning rate 
@@ -87,7 +89,7 @@ See `experiments/outputs/grid_proposed_hparams`.
 
 
 ## Citation
-```
+```bibtex
 @misc{rybkin2025valuebaseddeeprlscales,
       title={Value-Based Deep RL Scales Predictably}, 
       author={Oleh Rybkin and Michal Nauman and Preston Fu and Charlie Snell and Pieter Abbeel and Sergey Levine and Aviral Kumar},

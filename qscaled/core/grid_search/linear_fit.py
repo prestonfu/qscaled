@@ -5,13 +5,7 @@ import matplotlib.pyplot as plt
 
 from sklearn.linear_model import LinearRegression
 
-from qscaled.core.preprocessing import get_envs, get_utds, get_batch_sizes, get_learning_rates
-
-# TODO: clean up this whole file
-# one method for each type of fit (should just depend on df_best_lr_bs?)
-# one method for plotting either lr/bs given the fit (should work for both fits; here you pass in utds_to_predict)
-# one method for plotting lr given the fit
-# one method for plotting bs given the fit
+from qscaled.core.preprocessing import get_envs, get_utds
 
 
 def make_linear_fit_separate_slope(df_best_lr_bs, outputs_dir=None, save_path=None):
@@ -86,12 +80,13 @@ def get_shared_slope_predictions(reg_shared, utds_to_predict, envs):
 
 
 def make_linear_fit_shared_slope(df_best_lr_bs, outputs_dir=None, save_path=None):
+    envs = get_envs(df_best_lr_bs)
+
     def helper(df_best_lr_bs, x_col, y_col, label):
         """
         Plot linear fit for bootstrap averaged learning rate and batch size
         with a shared slope per environment.
         """
-        envs = get_envs(df_best_lr_bs)
         n_envs = len(envs)
         X_all = []
         y_all = []
@@ -146,8 +141,11 @@ def make_linear_fit_shared_slope(df_best_lr_bs, outputs_dir=None, save_path=None
         df_best_lr_bs, 'utd', 'best_bs_bootstrap_lrmean', label='batch size'
     )
 
-    lr_export = [lr_shared_slope, lr_env_intercepts]
-    bs_export = [bs_shared_slope, bs_env_intercepts]
+    lr_shared_slope_dict = {env: lr_shared_slope for env in envs}
+    bs_shared_slope_dict = {env: bs_shared_slope for env in envs}
+
+    lr_export = [lr_shared_slope_dict, lr_env_intercepts]
+    bs_export = [bs_shared_slope_dict, bs_env_intercepts]
 
     if outputs_dir is not None:
         save_dir = os.path.join(outputs_dir, 'grid_proposed_fits', save_path)
@@ -159,27 +157,51 @@ def make_linear_fit_shared_slope(df_best_lr_bs, outputs_dir=None, save_path=None
     return lr_reg_shared, bs_reg_shared
 
 
-def _plot_fits_against_grid(df_grid, df_best_lr_bs, utds_to_predict, og_predictions, desired_predictions, grid_y_col, bootstrap_y_col, title):
+def load_fits(directory, name, fit_type):
+    assert fit_type in ['separate', 'shared']
+    lr_path = os.path.join(directory, 'grid_proposed_fits', name, f'{fit_type}_lr_fit.npy')
+    bs_path = os.path.join(directory, 'grid_proposed_fits', name, f'{fit_type}_bs_fit.npy')
+    lr_env_slopes, lr_env_intercepts = np.load(lr_path, allow_pickle=True)
+    bs_env_slopes, bs_env_intercepts = np.load(bs_path, allow_pickle=True)
+    return lr_env_slopes, lr_env_intercepts, bs_env_slopes, bs_env_intercepts
+
+
+def get_fit_mean_batch_size(envs, directory, name, fit_type):
+    _, _, bs_env_slopes, bs_env_intercepts = load_fits(directory, name, fit_type)
+
+    def helper(utd):
+        batch_sizes = []
+        for env in envs:
+            batch_sizes.append(10 ** (bs_env_slopes[env] * np.log10(utd) + bs_env_intercepts[env]))
+        batch_sizes = np.stack(batch_sizes)
+        return np.mean(batch_sizes, axis=0)
+
+    return helper
+
+
+def _plot_fits_against_grid(
+    df_grid, df_best_lr_bs, utds_to_predict, og_predictions, desired_predictions, grid_y_col, bootstrap_y_col, title
+):
     """
     og_predictions: Predictions per env for utds in grid search
     desired_predictions: Predictions per env for utds to predict
-    
+
     Plot includes:
     * Bootstrap estimates
     * Linear fit
     * Proposed values
     * Grid search values
-    """  
+    """
     envs = get_envs(df_grid)
     n_envs = len(envs)
     n_cols = 4
     n_rows = (n_envs + n_cols - 1) // n_cols
     r2_str = r'$R^2$'
     utds_to_predict = np.array(utds_to_predict)
-    
+
     fig, axes = plt.subplots(n_rows, n_cols, figsize=(3 * n_cols, 3 * n_rows), sharey=True)
     axes = axes.flatten()
-    
+
     def r2_score(y, yhat):
         rss = np.sum((y - yhat) ** 2)
         tss = np.sum((y - np.mean(y)) ** 2)
@@ -216,12 +238,12 @@ def _plot_fits_against_grid(df_grid, df_best_lr_bs, utds_to_predict, og_predicti
         ax.set_xscale('log')
         ax.set_yscale('log')
         ax.set_xlabel('UTD')
-        ax.set_title(f"{env} ({r2_str}={r2:.2f})")
+        ax.set_title(f'{env} ({r2_str}={r2:.2f})')
         ax.grid(True)
-        
+
     for j in range(i + 1, len(axes)):
         fig.delaxes(axes[j])
-        
+
     handles, labels = ax.get_legend_handles_labels()
     fig.legend(handles, labels, bbox_to_anchor=(1.01, 0.5), loc='center left', borderaxespad=0, frameon=False)
     plt.suptitle(title, size=14)
@@ -234,24 +256,60 @@ def plot_fits_against_grid_separate_slope(df_grid, df_best_lr_bs, utds_to_predic
     utds = get_utds(df_grid)
     lr_predictions_og_utds = get_separate_slope_prediction(lr_regs, utds, envs)
     lr_predictions_desired_utds = get_separate_slope_prediction(lr_regs, utds_to_predict, envs)
-    _plot_fits_against_grid(df_grid, df_best_lr_bs, utds_to_predict, lr_predictions_og_utds, lr_predictions_desired_utds, 'learning_rate', 'best_lr_bootstrap_bsmean', r'$\eta^*$: Best learning rate')
-    
+    _plot_fits_against_grid(
+        df_grid,
+        df_best_lr_bs,
+        utds_to_predict,
+        lr_predictions_og_utds,
+        lr_predictions_desired_utds,
+        'learning_rate',
+        'best_lr_bootstrap_bsmean',
+        r'$\eta^*$: Best learning rate',
+    )
+
     bs_predictions_og_utds = get_separate_slope_prediction(bs_regs, utds, envs)
     bs_predictions_desired_utds = get_separate_slope_prediction(bs_regs, utds_to_predict, envs)
-    _plot_fits_against_grid(df_grid, df_best_lr_bs, utds_to_predict, bs_predictions_og_utds, bs_predictions_desired_utds, 'batch_size', 'best_bs_bootstrap_lrmean', r'$B^*$: Best batch size')
+    _plot_fits_against_grid(
+        df_grid,
+        df_best_lr_bs,
+        utds_to_predict,
+        bs_predictions_og_utds,
+        bs_predictions_desired_utds,
+        'batch_size',
+        'best_bs_bootstrap_lrmean',
+        r'$B^*$: Best batch size',
+    )
 
 
 def plot_fits_against_grid_shared_slope(df_grid, df_best_lr_bs, utds_to_predict, lr_reg_shared, bs_reg_shared):
     envs = get_envs(df_grid)
     utds = get_utds(df_grid)
-    
+
     lr_predictions_og_utds = get_shared_slope_predictions(lr_reg_shared, utds, envs)
     lr_predictions_desired_utds = get_shared_slope_predictions(lr_reg_shared, utds_to_predict, envs)
-    _plot_fits_against_grid(df_grid, df_best_lr_bs, utds_to_predict, lr_predictions_og_utds, lr_predictions_desired_utds, 'learning_rate', 'best_lr_bootstrap_bsmean', r'$\eta^*$: Best learning rate')
-    
+    _plot_fits_against_grid(
+        df_grid,
+        df_best_lr_bs,
+        utds_to_predict,
+        lr_predictions_og_utds,
+        lr_predictions_desired_utds,
+        'learning_rate',
+        'best_lr_bootstrap_bsmean',
+        r'$\eta^*$: Best learning rate',
+    )
+
     bs_predictions_og_utds = get_shared_slope_predictions(bs_reg_shared, utds, envs)
     bs_predictions_desired_utds = get_shared_slope_predictions(bs_reg_shared, utds_to_predict, envs)
-    _plot_fits_against_grid(df_grid, df_best_lr_bs, utds_to_predict, bs_predictions_og_utds, bs_predictions_desired_utds, 'batch_size', 'best_bs_bootstrap_lrmean', r'$B^*$: Best batch size')
+    _plot_fits_against_grid(
+        df_grid,
+        df_best_lr_bs,
+        utds_to_predict,
+        bs_predictions_og_utds,
+        bs_predictions_desired_utds,
+        'batch_size',
+        'best_bs_bootstrap_lrmean',
+        r'$B^*$: Best batch size',
+    )
 
 
 def _tabulate_proposed_hparams(

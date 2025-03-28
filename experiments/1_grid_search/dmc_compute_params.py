@@ -9,7 +9,7 @@ own data, check:
 for further details.
 """
 
-from compute_params import compute_params
+from qscaled.scripts.compute_params import compute_params
 from qscaled.utils.configs import SweepConfig
 
 config = SweepConfig(
@@ -20,6 +20,7 @@ config = SweepConfig(
     wandb_collector=None,
     env_step_freq=1000,
     env_step_start=5000,
+    baseline_utd_at=2,
 )
 
-compute_params(config)
+compute_params(config, '../outputs')

@@ -5,7 +5,6 @@ import wandb
 import pandas as pd
 
 from copy import deepcopy
-from functools import reduce
 from collections import defaultdict
 from typing import Dict, List, Tuple, Any
 from tqdm import tqdm
