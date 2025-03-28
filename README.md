@@ -39,7 +39,7 @@ bash qscaled/scripts/download_zipdata.sh
 ```
 
 Using data from our hyperparameter grid search, we can compute the "best" batch 
-size $B^{*} (\sigma)$ and learning rate $\eta^{*} (\sigma)$ according to our method.
+size $B^\* (\sigma)$ and learning rate $\eta^\* (\sigma)$ according to our method.
 To perform this analysis for e.g. OpenAI Gym,
 ```
 cd experiments/1_grid_search
@@ -54,8 +54,8 @@ First, run a hyperparameter grid search over UTD $\sigma$, batch size $B$,
 and learning rate $\eta$, with logging to [Wandb](https://wandb.ai/).
 In our experiments, we run 8-10 seeds per configuration.
 
-Using the results of this sweep, we will fit the "best" batch size $B^{*} (\sigma)$ 
-and learning rate $\eta^{*} (\sigma)$.
+Using the results of this sweep, we will fit the "best" batch size $B^\* (\sigma)$ 
+and learning rate $\eta^\* (\sigma)$.
 
 1. Depending on whether you are running one or multiple seeds
    in a single Wandb run, implement a subclass of
@@ -77,10 +77,10 @@ This procedure takes ~10 minutes!
 ## Actually, I just want your hyperparameters
 
 See `experiments/outputs/grid_proposed_hparams`. 
-* `shared` (**recommended**): Our batch size $B^{*}(\sigma)$ and learning rate 
-  $\eta^{*}(\sigma)$ log-linear fits use a shared slope across all tasks within 
+* `shared` (**recommended**): Our batch size $B^\*(\sigma)$ and learning rate 
+  $\eta^\*(\sigma)$ log-linear fits use a shared slope across all tasks within 
   the same benchmark.
-* `separate`: We fit $B^{*}(\sigma)$ and $\eta^{*}(\sigma)$ separately for each task.
+* `separate`: We fit $B^\*(\sigma)$ and $\eta^\*(\sigma)$ separately for each task.
 * `baseline_utd{sigma}`: We compare our approach against taking the best $B$ and $\eta$
   for some given UTD $\sigma$, and reusing the same $B$ and $\eta$ for all other
   UTDs.
