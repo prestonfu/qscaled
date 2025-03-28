@@ -6,7 +6,7 @@ from qscaled.wandb_utils.base_collector import BaseCollector
 
 @dataclass(kw_only=True)
 class BaseConfig:
-    name: str  # Name of the experiment, used for filenames
+    name: str  # Name of the experiment, used for zip filename
     max_returns: Dict[str, float]  # Maximum returns per environment
     returns_key: str  # Logging key for offline returns
     thresholds: ClassVar[List[int]] = [100, 200, 300, 400, 500, 600, 700, 800]  # Return thresholds out of 1000

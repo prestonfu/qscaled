@@ -23,16 +23,32 @@ QScaled can be easily installed in any environment with Python >= 3.10.
 pip install -e .
 ```
 
+## Workflow
+
+We collect run data from the Wandb API using the `BaseCollector` subclasses
+defined in [`qscaled/wandb_utils`](qscaled/wandb_utils). Then, we format this
+data into zip files, saved to `~/.qscaled/zip` by default. Then, to perform
+analysis on this data, we reference these zip files by name in `experiments`.
+
+
 ## Replicate paper results
 
-We fit the "best" batch size $B^* (\sigma)$ and learning rate $\eta^* (\sigma)$. To compute these proposed hyperparameters for e.g. OpenAI Gym,
+First, download the zip files from our experiments.
 ```
-cd examples/1_grid_search
+bash qscaled/scripts/download_zipdata.sh
+```
+
+Using data from our hyperparameter grid search, we can compute the "best" batch 
+size $B^* (\sigma)$ and learning rate $\eta^* (\sigma)$ according to our method.
+To perform this analysis for e.g. OpenAI Gym,
+```
+cd experiments/1_grid_search
 python gym_compute_params.py
 ```
-For a closer look at our method, see e.g. [`gym_explore.ipynb`](examples/1_grid_search/gym_explore.ipynb).
+For a closer look at our method, see e.g. [`gym_explore.ipynb`](experiments/1_grid_search/gym_explore.ipynb).
 
-## Replicate our method on your runs
+
+## Replicate our method on your Wandb runs
 
 First, run a hyperparameter grid search over UTD $\sigma$, batch size $B$, 
 and learning rate $\eta$, with logging to [Wandb](https://wandb.ai/).
@@ -43,18 +59,32 @@ and learning rate $\eta^* (\sigma)$.
 
 1. Depending on whether you are running one or multiple seeds
    in a single Wandb run, implement a subclass of
-   [`OneSeedPerRunCollector`](qscaled/wandb_utils/one_seed_per_run.py) or [`MultipleSeedsPerRunCollector`](qscaled/wandb_utils/multiple_seeds_per_run.py),
+   [`OneSeedPerRunCollector`](qscaled/wandb_utils/one_seed_per_run.py) or 
+   [`MultipleSeedsPerRunCollector`](qscaled/wandb_utils/multiple_seeds_per_run.py),
    which have example subclass implementations
    [`ExampleOneSeedPerRunCollector`](qscaled/wandb_utils/one_seed_per_run.py)
    and [`ExampleMultipleSeedsPerRunCollector`](qscaled/wandb_utils/multiple_seeds_per_run.py), 
    respectively.
-2. Make a copy of [`gym_explore`](examples/1_grid_search/gym_explore.py).
+2. Make a copy of [`gym_explore`](experiments/1_grid_search/gym_explore.py).
 3. Label your Wandb runs with tags (or, if you don't have many runs,
    skip this step and leave `wandb_tags` as `[]`). You can add tags by 
    selecting runs in the Wandb UI and clicking "Tag".
 4. Update the `SweepConfig`.
 
 This procedure takes ~10 minutes!
+
+
+## Actually, I just want your hyperparameters
+
+See `experiments/outputs/grid_proposed_hparams`. 
+* `shared` (**recommended**): Our batch size $B^*(\sigma)$ and learning rate 
+  $\eta^*(\sigma)$ log-linear fits use a shared slope across all tasks within 
+  the same benchmark.
+* `separate`: We fit $B^*(\sigma)$ and $\eta^*(\sigma)$ separately for each task.
+* `baseline_utd{sigma}`: We compare our approach against taking the best $B$ and $\eta$
+  for some given UTD $\sigma$, and reusing the same $B$ and $\eta$ for all other
+  UTDs.
+
 
 ## Citation
 ```
