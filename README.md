@@ -1,5 +1,5 @@
 # Value-Based Deep RL Scales Predictably
-### [Preprint](https://arxiv.org/abs/2502.04327)
+### [Paper](https://arxiv.org/abs/2502.04327)
 
 Implementation of a workflow for evaluating trade-offs between data efficiency,
 compute efficiency, and performance for online RL, validated across multiple
@@ -18,26 +18,43 @@ environments.
 
 ## Installation
 
+QScaled can be easily installed in any environment with Python >= 3.10.
 ```
 pip install -e .
 ```
 
-It requires Python 3.10+.
+## Replicate paper results
 
-## Running code
+We fit the "best" batch size $B^* (\sigma)$ and learning rate $\eta^* (\sigma)$. To compute these proposed hyperparameters for e.g. OpenAI Gym,
+```
+cd examples/1_grid_search
+python gym_compute_params.py
+```
+For a closer look at our method, see e.g. [`gym_explore.ipynb`](examples/1_grid_search/gym_explore.ipynb).
 
-### Workflow
-1. Run a hyperparameter grid search over UTD $\sigma$, batch size $B$, learning rate $\eta$, with logging to [Wandb](https://wandb.ai/).
-2. Run [`analyze_grid_search.ipynb`](analyze_grid_search.ipynb). This produces fits 
-   $B^* (\sigma)$, $\eta^* (\sigma)$, as well as a baseline using the best $(B, \eta)$ 
-   setting for some $\sigma$ on each environment.
-3. Run the proposed fit and the baseline.
-4. Run [`analyze_fitted.ipynb`](analyze_fitted.ipynb).
+## Replicate our method on your runs
 
-### Replicating paper results
-We have provided sample `zip` files containing run data fetched from Wandb in 
-[`data/zip`](data/zip). Running the aforementioned notebooks above will use those 
-zip` files by default.
+First, run a hyperparameter grid search over UTD $\sigma$, batch size $B$, 
+and learning rate $\eta$, with logging to [Wandb](https://wandb.ai/).
+In our experiments, we run 8-10 seeds per configuration.
+
+Using the results of this sweep, we will fit the "best" batch size $B^* (\sigma)$ 
+and learning rate $\eta^* (\sigma)$.
+
+1. Depending on whether you are running one or multiple seeds
+   in a single Wandb run, implement a subclass of
+   [`OneSeedPerRunCollector`](qscaled/wandb_utils/one_seed_per_run.py) or [`MultipleSeedsPerRunCollector`](qscaled/wandb_utils/multiple_seeds_per_run.py),
+   which have example subclass implementations
+   [`ExampleOneSeedPerRunCollector`](qscaled/wandb_utils/one_seed_per_run.py)
+   and [`ExampleMultipleSeedsPerRunCollector`](qscaled/wandb_utils/multiple_seeds_per_run.py), 
+   respectively.
+2. Make a copy of [`gym_explore`](examples/1_grid_search/gym_explore.py).
+3. Label your Wandb runs with tags (or, if you don't have many runs,
+   skip this step and leave `wandb_tags` as `[]`). You can add tags by 
+   selecting runs in the Wandb UI and clicking "Tag".
+4. Update the `SweepConfig`.
+
+This procedure takes ~10 minutes!
 
 ## Citation
 ```

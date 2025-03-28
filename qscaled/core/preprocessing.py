@@ -11,7 +11,7 @@ from qscaled.constants import QSCALED_PATH
 np.random.seed(42)
 
 
-def bootstrap_crossings(df, thresholds, filename: str):
+def bootstrap_crossings(df, thresholds, filename: str, use_cached=True):
     bootstrap_cache_file = os.path.join(QSCALED_PATH, 'bootstrap_results', f'{filename}.pkl')
 
     # Isotonic regression
@@ -39,8 +39,7 @@ def bootstrap_crossings(df, thresholds, filename: str):
 
     df['crossings'] = crossings_array
 
-    # Bootstrapping
-    if os.path.exists(bootstrap_cache_file):
+    if use_cached and os.path.exists(bootstrap_cache_file):
         with open(bootstrap_cache_file, 'rb') as f:
             results = pkl.load(f)
             iso_reg = results['iso_reg']
@@ -100,7 +99,6 @@ def bootstrap_crossings(df, thresholds, filename: str):
 
     mean_std = np.nanmean(np.array(crossings_std))
     print(f'Average standard deviation across all conditions: {mean_std:.2f}')
-
     return df
 
 

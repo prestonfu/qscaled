@@ -159,8 +159,11 @@ def make_linear_fit_shared_slope(df_best_lr_bs, outputs_dir=None, save_path=None
     return lr_reg_shared, bs_reg_shared
 
 
-def _plot_fits_against_grid(df_grid, df_best_lr_bs, utds_to_predict, predictions_per_env, grid_y_col, bootstrap_y_col, title):
+def _plot_fits_against_grid(df_grid, df_best_lr_bs, utds_to_predict, og_predictions, desired_predictions, grid_y_col, bootstrap_y_col, title):
     """
+    og_predictions: Predictions per env for utds in grid search
+    desired_predictions: Predictions per env for utds to predict
+    
     Plot includes:
     * Bootstrap estimates
     * Linear fit
@@ -191,14 +194,12 @@ def _plot_fits_against_grid(df_grid, df_best_lr_bs, utds_to_predict, predictions
         # Plot bootstrap estimates
         ax.scatter(utd_values, bootstrap_estimates, label='Bootstrap estimates', color='black')
 
-        # Plot linear fit
-        predictions = np.array(predictions_per_env[env])
-        utd_in_range_mask = np.isin(utds_to_predict, utd_values)
-        ax.plot(utds_to_predict[utd_in_range_mask], predictions[utd_in_range_mask], label='Fit', color='black')
-        r2 = r2_score(np.log10(bootstrap_estimates), np.log10(predictions[utd_in_range_mask]))
+        # Plot linear fit for UTDs within support
+        ax.plot(utd_values, og_predictions[env], label='Fit', color='black')
+        r2 = r2_score(np.log10(bootstrap_estimates), np.log10(og_predictions[env]))
 
         # Plot proposed values
-        ax.scatter(utds_to_predict, predictions, marker='o', color='lightblue', label='Proposed values')
+        ax.scatter(utds_to_predict, desired_predictions[env], marker='o', color='lightblue', label='Proposed values')
 
         # Plot grid search values
         grid_kw = dict(color='black', alpha=0.2, linestyle='--')
@@ -223,23 +224,34 @@ def _plot_fits_against_grid(df_grid, df_best_lr_bs, utds_to_predict, predictions
         
     handles, labels = ax.get_legend_handles_labels()
     fig.legend(handles, labels, bbox_to_anchor=(1.01, 0.5), loc='center left', borderaxespad=0, frameon=False)
-    plt.suptitle(title)
+    plt.suptitle(title, size=14)
     plt.tight_layout()
     plt.show()
 
 
 def plot_fits_against_grid_separate_slope(df_grid, df_best_lr_bs, utds_to_predict, lr_regs, bs_regs):
-    lr_predictions = get_separate_slope_prediction(lr_regs, utds_to_predict, get_envs(df_grid))
-    _plot_fits_against_grid(df_grid, df_best_lr_bs, utds_to_predict, lr_predictions, 'learning_rate', 'best_lr_bootstrap_bsmean', r'$\eta^*$: Best learning rate')
-    bs_predictions = get_separate_slope_prediction(bs_regs, utds_to_predict, get_envs(df_grid))
-    _plot_fits_against_grid(df_grid, df_best_lr_bs, utds_to_predict, bs_predictions, 'batch_size', 'best_bs_bootstrap_lrmean', r'$B^*$: Best batch size')
+    envs = get_envs(df_grid)
+    utds = get_utds(df_grid)
+    lr_predictions_og_utds = get_separate_slope_prediction(lr_regs, utds, envs)
+    lr_predictions_desired_utds = get_separate_slope_prediction(lr_regs, utds_to_predict, envs)
+    _plot_fits_against_grid(df_grid, df_best_lr_bs, utds_to_predict, lr_predictions_og_utds, lr_predictions_desired_utds, 'learning_rate', 'best_lr_bootstrap_bsmean', r'$\eta^*$: Best learning rate')
+    
+    bs_predictions_og_utds = get_separate_slope_prediction(bs_regs, utds, envs)
+    bs_predictions_desired_utds = get_separate_slope_prediction(bs_regs, utds_to_predict, envs)
+    _plot_fits_against_grid(df_grid, df_best_lr_bs, utds_to_predict, bs_predictions_og_utds, bs_predictions_desired_utds, 'batch_size', 'best_bs_bootstrap_lrmean', r'$B^*$: Best batch size')
 
 
 def plot_fits_against_grid_shared_slope(df_grid, df_best_lr_bs, utds_to_predict, lr_reg_shared, bs_reg_shared):
-    lr_predictions = get_shared_slope_predictions(lr_reg_shared, utds_to_predict, get_envs(df_grid))
-    _plot_fits_against_grid(df_grid, df_best_lr_bs, utds_to_predict, lr_predictions, 'learning_rate', 'best_lr_bootstrap_bsmean', r'$\eta^*$: Best learning rate')
-    bs_predictions = get_shared_slope_predictions(bs_reg_shared, utds_to_predict, get_envs(df_grid))
-    _plot_fits_against_grid(df_grid, df_best_lr_bs, utds_to_predict, bs_predictions, 'batch_size', 'best_bs_bootstrap_lrmean', r'$B^*$: Best batch size')
+    envs = get_envs(df_grid)
+    utds = get_utds(df_grid)
+    
+    lr_predictions_og_utds = get_shared_slope_predictions(lr_reg_shared, utds, envs)
+    lr_predictions_desired_utds = get_shared_slope_predictions(lr_reg_shared, utds_to_predict, envs)
+    _plot_fits_against_grid(df_grid, df_best_lr_bs, utds_to_predict, lr_predictions_og_utds, lr_predictions_desired_utds, 'learning_rate', 'best_lr_bootstrap_bsmean', r'$\eta^*$: Best learning rate')
+    
+    bs_predictions_og_utds = get_shared_slope_predictions(bs_reg_shared, utds, envs)
+    bs_predictions_desired_utds = get_shared_slope_predictions(bs_reg_shared, utds_to_predict, envs)
+    _plot_fits_against_grid(df_grid, df_best_lr_bs, utds_to_predict, bs_predictions_og_utds, bs_predictions_desired_utds, 'batch_size', 'best_bs_bootstrap_lrmean', r'$B^*$: Best batch size')
 
 
 def _tabulate_proposed_hparams(

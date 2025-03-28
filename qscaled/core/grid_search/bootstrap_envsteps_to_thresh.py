@@ -225,136 +225,66 @@ def plot_bootstrap_average_params(df_best_lr_bs):
     # Create first figure for batch size plots
     n_cols = 4
     n_rows = (n_envs + n_cols - 1) // n_cols
+    errorbar_kw = dict(fmt='o-', capsize=5, alpha=0.4)
 
-    # Plot 1: Optimal learning rate vs UTD with bootstrap CIs and mean optimal learning rate
-    fig_lr, axes_lr = plt.subplots(n_rows, n_cols, figsize=(5 * n_cols, 5 * n_rows), sharey=True)
-    axes_lr = axes_lr.flatten()
+    def helper(optim_key, other_key, title):
+        fig, axes = plt.subplots(n_rows, n_cols, figsize=(4.5 * n_cols, 4 * n_rows), sharey=True)
+        axes = axes.flatten()
+        
+        for i, env in enumerate(envs):
+            env_data = df_best_lr_bs[df_best_lr_bs['env_name'] == env]
 
-    for i, env in enumerate(envs):
-        env_data = df_best_lr_bs[df_best_lr_bs['env_name'] == env]
+            # Calculate correlation for point estimate
+            point_corr = np.corrcoef(np.log10(env_data['utd']), np.log10(env_data[f'best_{optim_key}']))[0, 1]
+            axes[i].plot(
+                env_data['utd'],
+                env_data[f'best_{optim_key}'],
+                'o-',
+                label=f'Point estimate (corr={point_corr:.3f})',
+            )
 
-        # Calculate correlation for point estimate
-        point_lr_corr = np.corrcoef(np.log10(env_data['utd']), np.log10(env_data['best_lr']))[0, 1]
-        axes_lr[i].plot(
-            env_data['utd'],
-            env_data['best_lr'],
-            'o-',
-            label=f'Point estimate (corr={point_lr_corr:.3f})',
-        )
+            # Add bootstrapped confidence intervals
+            bootstrap_corr = np.corrcoef(np.log10(env_data['utd']), np.log10(env_data[f'best_{optim_key}_bootstrap_mean']))[0, 1]
+            axes[i].errorbar(
+                env_data['utd'],
+                env_data[f'best_{optim_key}_bootstrap_mean'],
+                yerr=env_data[f'best_{optim_key}_bootstrap_std'],
+                label=f'Bootstrap (corr={bootstrap_corr:.3f})',
+                **errorbar_kw,
+            )
 
-        # Add bootstrapped confidence intervals
-        bootstrap_lr_corr = np.corrcoef(np.log10(env_data['utd']), np.log10(env_data['best_lr_bootstrap_mean']))[0, 1]
-        axes_lr[i].errorbar(
-            env_data['utd'],
-            env_data['best_lr_bootstrap_mean'],
-            yerr=env_data['best_lr_bootstrap_std'],
-            fmt='o-',
-            capsize=5,
-            alpha=0.4,
-            label=f'Bootstrap (corr={bootstrap_lr_corr:.3f})',
-        )
+            # Add mean optimal learning rate
+            mean_corr = np.corrcoef(np.log10(env_data['utd']), np.log10(env_data[f'best_{optim_key}_{other_key}mean']))[0, 1]
+            axes[i].errorbar(
+                env_data['utd'],
+                env_data[f'best_{optim_key}_{other_key}mean'],
+                yerr=env_data[f'best_{optim_key}_{other_key}mean_std'],
+                label=f'Mean across {other_key.upper()}s (corr={mean_corr:.3f})',
+                **errorbar_kw,
+            )
 
-        # Add mean optimal learning rate
-        lr_corr = np.corrcoef(np.log10(env_data['utd']), np.log10(env_data['best_lr_bsmean']))[0, 1]
-        axes_lr[i].errorbar(
-            env_data['utd'],
-            env_data['best_lr_bsmean'],
-            yerr=env_data['best_lr_bsmean_std'],
-            fmt='o-',
-            capsize=5,
-            alpha=0.4,
-            label=f'Mean across BSs (corr={lr_corr:.3f})',
-        )
+            # Add mean learning rate averaged across batch sizes and bootstrap intervals
+            mean_bootstrap_corr = np.corrcoef(np.log10(env_data['utd']), np.log10(env_data[f'best_{optim_key}_bootstrap_{other_key}mean']))[0, 1]
+            axes[i].errorbar(
+                env_data['utd'],
+                env_data[f'best_{optim_key}_bootstrap_{other_key}mean'],
+                yerr=env_data[f'best_{optim_key}_bootstrap_{other_key}mean_std'],
+                label=f'Bootstrap Mean across {other_key.upper()}s (corr={mean_bootstrap_corr:.3f})',
+                **errorbar_kw,
+            )
 
-        # Add mean learning rate averaged across batch sizes and bootstrap intervals
-        lr_corr_all = np.corrcoef(np.log10(env_data['utd']), np.log10(env_data['best_lr_bootstrap_bsmean']))[0, 1]
-        axes_lr[i].errorbar(
-            env_data['utd'],
-            env_data['best_lr_bootstrap_bsmean'],
-            yerr=env_data['best_lr_bootstrap_bsmean_std'],
-            fmt='o-',
-            capsize=5,
-            alpha=0.4,
-            label=f'Bootstrap Mean across BSs (corr={lr_corr_all:.3f})',
-        )
+            axes[i].set_xscale('log')
+            axes[i].set_yscale('log')
+            axes[i].set_xlabel('UTD')
+            axes[i].set_title(env, size=14)
+            axes[i].grid(True)
+            axes[i].legend()
 
-        axes_lr[i].set_xscale('log')
-        axes_lr[i].set_yscale('log')
-        axes_lr[i].set_xlabel('UTD')
-        axes_lr[i].set_title(f'{env}\nCorr: {lr_corr:.3f}')
-        axes_lr[i].grid(True)
-        axes_lr[i].legend()
-
-    # Remove empty subplots from second figure
-    for j in range(i + 1, len(axes_lr)):
-        fig_lr.delaxes(axes_lr[j])
-    plt.suptitle(r'$\eta^*$: Best learning rate')
-    plt.tight_layout()
-    plt.show()
-
-    # Plot 2: Optimal batch size vs UTD with bootstrap CIs and mean optimal batch size
-    fig_bs, axes_bs = plt.subplots(n_rows, n_cols, figsize=(5 * n_cols, 5 * n_rows), sharey=True)
-    axes_bs = axes_bs.flatten()
-
-    for i, env in enumerate(envs):
-        env_data = df_best_lr_bs[df_best_lr_bs['env_name'] == env]
-
-        # Calculate correlation for point estimate
-        point_bs_corr = np.corrcoef(np.log10(env_data['utd']), np.log10(env_data['best_bs']))[0, 1]
-        axes_bs[i].errorbar(
-            env_data['utd'],
-            env_data['best_bs'],
-            yerr=None,
-            fmt='o-',
-            label=f'Point estimate (corr={point_bs_corr:.3f})',
-        )
-
-        # Add bootstrapped confidence intervals
-        bootstrap_bs_corr = np.corrcoef(np.log10(env_data['utd']), np.log10(env_data['best_bs_bootstrap_mean']))[0, 1]
-        axes_bs[i].errorbar(
-            env_data['utd'],
-            env_data['best_bs_bootstrap_mean'],
-            yerr=env_data['best_bs_bootstrap_std'],
-            fmt='o-',
-            capsize=5,
-            alpha=0.4,
-            label=f'Bootstrap (corr={bootstrap_bs_corr:.3f})',
-        )
-
-        # Add mean optimal batch size
-        bs_corr = np.corrcoef(np.log10(env_data['utd']), np.log10(env_data['best_bs_lrmean']))[0, 1]
-        axes_bs[i].errorbar(
-            env_data['utd'],
-            env_data['best_bs_lrmean'],
-            yerr=env_data['best_bs_lrmean_std'],
-            fmt='o-',
-            capsize=5,
-            alpha=0.4,
-            label=f'Mean across LRs (corr={bs_corr:.3f})',
-        )
-
-        # Add mean batch size averaged across learning rates and bootstrap intervals
-        bs_corr_all = np.corrcoef(np.log10(env_data['utd']), np.log10(env_data['best_bs_bootstrap_lrmean']))[0, 1]
-        axes_bs[i].errorbar(
-            env_data['utd'],
-            env_data['best_bs_bootstrap_lrmean'],
-            yerr=env_data['best_bs_bootstrap_lrmean_std'],
-            fmt='o-',
-            capsize=5,
-            alpha=0.4,
-            label=f'Bootstrap Mean across LRs (corr={bs_corr_all:.3f})',
-        )
-
-        axes_bs[i].set_xscale('log')
-        axes_bs[i].set_yscale('log')
-        axes_bs[i].set_xlabel('UTD')
-        axes_bs[i].set_title(f'{env}')
-        axes_bs[i].grid(True)
-        axes_bs[i].legend()
-
-    # Remove empty subplots from first figure
-    for j in range(i + 1, len(axes_bs)):
-        fig_bs.delaxes(axes_bs[j])
-    plt.suptitle(r'$B^*$: Best batch size')
-    plt.tight_layout()
-    plt.show()
+        for j in range(i + 1, len(axes)):
+            fig.delaxes(axes[j])
+        plt.suptitle(title, size=16)
+        plt.tight_layout()
+        plt.show()
+        
+    helper('lr', 'bs', r'$\eta^*$: Learning rate')
+    helper('bs', 'lr', r'$B^*$: Best batch size')

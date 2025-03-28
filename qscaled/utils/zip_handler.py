@@ -26,7 +26,7 @@ def fetch_zip_data(config: BaseConfig, use_cached=True) -> pd.DataFrame:
 
     if not use_cached or not os.path.exists(f'{handler._zip_path}/{handler._config.name}.zip'):
         collector = handler._config.wandb_collector
-        assert collector is not None
+        assert collector is not None, 'Wandb collector must be provided if cache is unused or does not exist.'
         handler.save_prezip()
         handler.save_zip()
 
@@ -58,7 +58,7 @@ class ZipHandler:
         """Saves prezip folder to zip."""
         os.makedirs(self._zip_path, exist_ok=True)
         subprocess.run(
-            f'zip -r {self._zip_path}/{self._config.name}.zip {self._config.name}',
+            f'zip -r {self._config.name}.zip {self._config.name} && mv {self._config.name}.zip {self._zip_path}',
             shell=True,
             check=True,
             cwd=os.dirname(self._prezip_path),
@@ -129,5 +129,7 @@ class ZipHandler:
                         'std_return': np.std(returns_data, axis=1) / np.sqrt(returns_data.shape[1]),  # Standard error
                     }
                     records.append(record)
-
+        
+        if len(records) == 0:
+            raise ValueError('No data found in zip file.')
         return pd.DataFrame(records)
