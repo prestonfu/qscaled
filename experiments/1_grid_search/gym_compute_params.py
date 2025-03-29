@@ -21,7 +21,7 @@ wandb_collect = False
 
 if wandb_collect:
     wandb_collector = ExampleOneSeedPerRunCollector(
-        'prestonfu', 'crl', wandb_tags=['sac_grid_manual_250206']
+        'username', 'crl', wandb_tags=['sac_grid_manual_250206']
     )
     # Remove these lines if you'd like; some of our runs crashed
     wandb_collector.remove_short(0.95)

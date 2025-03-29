@@ -19,16 +19,10 @@ dependencies = [
   "wandb",
 ]
 authors = [
-    { name = "Oleh Rybkin" },
-    { name = "Michal Nauman" },
-    { name = "Preston Fu" },
-    { name = "Charlie Snell" },
-    { name = "Pieter Abbeel" },
-    { name = "Sergey Levine" },
-    { name = "Aviral Kumar" },
+    { name = "Anonymous" },
 ]
 maintainers = [
-    { name = "Preston Fu", email = "prestonfu@berkeley.edu" }
+    { name = "Anonymous", email = "hello@world" }
 ]
 license = { file = "LICENSE" }
 classifiers = ["License :: OSI Approved :: MIT License"]
@@ -38,9 +32,6 @@ dynamic = ["description"]
 dev = [
     "ruff",
 ]
-
-[project.urls]
-Home = "https://github.com/prestonfu/qscaled"
 
 [tool.ruff]
 target-version = "py310"
