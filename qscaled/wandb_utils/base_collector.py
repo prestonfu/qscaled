@@ -1,7 +1,6 @@
 import os
 import abc
 import numpy as np
-import wandb
 import pandas as pd
 
 from copy import deepcopy
@@ -11,8 +10,6 @@ from tqdm import tqdm
 from multiprocessing.pool import ThreadPool
 
 from qscaled.constants import QSCALED_PATH, suppress_overwrite_prompt
-
-api = wandb.Api(timeout=120)
 
 
 class BaseCollector(abc.ABC):
@@ -43,6 +40,8 @@ class BaseCollector(abc.ABC):
         * `_metadatas` maps keys to lists of metadata dictionaries.
         * `_rundatas` maps keys to lists of dataframes.
         """
+        import wandb
+        self._wandb_api = wandb.Api(timeout=120)
         self._wandb_entity = wandb_entity
         self._wandb_project = wandb_project
         self._path = os.path.join(QSCALED_PATH, 'collector', f'{wandb_entity}:{wandb_project}')
@@ -323,7 +322,7 @@ class BaseCollector(abc.ABC):
                     tag_filter = {'tags': {'$in': [tag]}}
                     tqdm_desc = f'{wandb_str}: {tag}'
 
-                runs = api.runs(f'{collector._wandb_entity}/{collector._wandb_project}', tag_filter)
+                runs = self._wandb_api.runs(f'{collector._wandb_entity}/{collector._wandb_project}', tag_filter)
                 insert_verbose = lambda run: collector._insert_wandb_run(run, verbose)
                 if parallel:
                     with ThreadPool(int(os.cpu_count() * 0.5)) as pool:
