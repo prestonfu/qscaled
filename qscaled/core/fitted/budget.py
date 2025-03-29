@@ -127,7 +127,9 @@ def plot_compute_data_isoperformance(
     ax_set_y_bounds_and_scale(ax, ylim, yscale)
 
     # Add colorbar
-    sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=min(thresholds), vmax=max(thresholds)))
+    sm = plt.cm.ScalarMappable(
+        cmap=cmap, norm=plt.Normalize(vmin=min(thresholds), vmax=max(thresholds))
+    )
     sm.set_array([])
     cbar = plt.colorbar(sm, ax=plt.gca())
     cbar.set_label('$J$: Performance level', size='xx-large')
@@ -164,7 +166,9 @@ def plot_budget_extrapolation(
     # Fit line in log space
     min_points_budget = min_points_compute + delta * min_points_data
     coeffs = np.polyfit(
-        np.log10(min_points_budget[:-n_extrapolate_points]), np.log10(min_points_utd[:-n_extrapolate_points]), 1
+        np.log10(min_points_budget[:-n_extrapolate_points]),
+        np.log10(min_points_utd[:-n_extrapolate_points]),
+        1,
     )
 
     # Generate points for the fitted line
@@ -176,7 +180,9 @@ def plot_budget_extrapolation(
     )
     utd_line = 10 ** (coeffs[0] * np.log10(budget_line) + coeffs[1])
 
-    plt.plot(budget_line, utd_line, color='gray', linewidth=3, alpha=0.8, label='$\sigma^*(\mathcal{F})$')
+    plt.plot(
+        budget_line, utd_line, color='gray', linewidth=3, alpha=0.8, label='$\sigma^*(\mathcal{F})$'
+    )
     plt.scatter(
         min_points_budget[:-n_extrapolate_points],
         min_points_utd[:-n_extrapolate_points],

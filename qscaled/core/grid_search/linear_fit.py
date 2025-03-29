@@ -9,7 +9,9 @@ from qscaled.core.preprocessing import get_envs, get_utds
 
 
 def make_linear_fit_separate_slope(df_best_lr_bs, outputs_dir=None, save_path=None):
-    assert (outputs_dir is None) == (save_path is None), 'Both outputs_dir and save_path must be provided or neither'
+    assert (outputs_dir is None) == (save_path is None), (
+        'Both outputs_dir and save_path must be provided or neither'
+    )
 
     def helper(x_col, y_col, label):
         regs = {}
@@ -34,14 +36,20 @@ def make_linear_fit_separate_slope(df_best_lr_bs, outputs_dir=None, save_path=No
 
             formatted_env = f'{env}:'.ljust(max_env_len + 1)
             formatted_label = label.ljust(max_label_len)
-            print(f'  {formatted_env}  {formatted_label} ~ {10**env_intercept:.6f} * UTD^{env_slope:.6f}')
+            print(
+                f'  {formatted_env}  {formatted_label} ~ {10**env_intercept:.6f} * UTD^{env_slope:.6f}'
+            )
 
         print()
         return regs, env_slopes, env_intercepts
 
     print('Separate slope fits:')
-    lr_regs, lr_env_slopes, lr_env_intercepts = helper('utd', 'best_lr_bootstrap_bsmean', label='learning rate')
-    bs_regs, bs_env_slopes, bs_env_intercepts = helper('utd', 'best_bs_bootstrap_lrmean', label='batch size')
+    lr_regs, lr_env_slopes, lr_env_intercepts = helper(
+        'utd', 'best_lr_bootstrap_bsmean', label='learning rate'
+    )
+    bs_regs, bs_env_slopes, bs_env_intercepts = helper(
+        'utd', 'best_bs_bootstrap_lrmean', label='batch size'
+    )
 
     lr_export = [lr_env_slopes, lr_env_intercepts]
     bs_export = [bs_env_slopes, bs_env_intercepts]
@@ -108,7 +116,9 @@ def make_linear_fit_shared_slope(df_best_lr_bs, outputs_dir=None, save_path=None
             env_dummies[env_indices == i, i] = 1
 
         # Combine UTD and environment dummies
-        X_combined = np.hstack([X_all, env_dummies[:, 1:]])  # Drop first dummy to avoid collinearity
+        X_combined = np.hstack(
+            [X_all, env_dummies[:, 1:]]
+        )  # Drop first dummy to avoid collinearity
 
         # Fit regression
         reg_shared = LinearRegression(fit_intercept=True).fit(X_combined, y_all)
@@ -126,12 +136,16 @@ def make_linear_fit_shared_slope(df_best_lr_bs, outputs_dir=None, save_path=None
         for i, env in enumerate(envs):
             formatted_env = f'{env}:'.ljust(max_env_len + 1)
             formatted_label = label.ljust(max_label_len)
-            print(f'  {formatted_env}  {formatted_label} ~ {10 ** env_intercepts[env]:.6f} * UTD^{shared_slope:.6f}')
+            print(
+                f'  {formatted_env}  {formatted_label} ~ {10 ** env_intercepts[env]:.6f} * UTD^{shared_slope:.6f}'
+            )
 
         print()
         return reg_shared, shared_slope, env_intercepts
 
-    assert (outputs_dir is None) == (save_path is None), 'Both outputs_dir and save_path must be provided or neither'
+    assert (outputs_dir is None) == (save_path is None), (
+        'Both outputs_dir and save_path must be provided or neither'
+    )
 
     print('Shared slope fits:')
     lr_reg_shared, lr_shared_slope, lr_env_intercepts = helper(
@@ -180,7 +194,14 @@ def get_fit_mean_batch_size(envs, directory, name, fit_type):
 
 
 def _plot_fits_against_grid(
-    df_grid, df_best_lr_bs, utds_to_predict, og_predictions, desired_predictions, grid_y_col, bootstrap_y_col, title
+    df_grid,
+    df_best_lr_bs,
+    utds_to_predict,
+    og_predictions,
+    desired_predictions,
+    grid_y_col,
+    bootstrap_y_col,
+    title,
 ):
     """
     og_predictions: Predictions per env for utds in grid search
@@ -221,7 +242,13 @@ def _plot_fits_against_grid(
         r2 = r2_score(np.log10(bootstrap_estimates), np.log10(og_predictions[env]))
 
         # Plot proposed values
-        ax.scatter(utds_to_predict, desired_predictions[env], marker='o', color='lightblue', label='Proposed values')
+        ax.scatter(
+            utds_to_predict,
+            desired_predictions[env],
+            marker='o',
+            color='lightblue',
+            label='Proposed values',
+        )
 
         # Plot grid search values
         grid_kw = dict(color='black', alpha=0.2, linestyle='--')
@@ -245,13 +272,22 @@ def _plot_fits_against_grid(
         fig.delaxes(axes[j])
 
     handles, labels = ax.get_legend_handles_labels()
-    fig.legend(handles, labels, bbox_to_anchor=(1.01, 0.5), loc='center left', borderaxespad=0, frameon=False)
+    fig.legend(
+        handles,
+        labels,
+        bbox_to_anchor=(1.01, 0.5),
+        loc='center left',
+        borderaxespad=0,
+        frameon=False,
+    )
     plt.suptitle(title, size=14)
     plt.tight_layout()
     plt.show()
 
 
-def plot_fits_against_grid_separate_slope(df_grid, df_best_lr_bs, utds_to_predict, lr_regs, bs_regs):
+def plot_fits_against_grid_separate_slope(
+    df_grid, df_best_lr_bs, utds_to_predict, lr_regs, bs_regs
+):
     envs = get_envs(df_grid)
     utds = get_utds(df_grid)
     lr_predictions_og_utds = get_separate_slope_prediction(lr_regs, utds, envs)
@@ -281,7 +317,9 @@ def plot_fits_against_grid_separate_slope(df_grid, df_best_lr_bs, utds_to_predic
     )
 
 
-def plot_fits_against_grid_shared_slope(df_grid, df_best_lr_bs, utds_to_predict, lr_reg_shared, bs_reg_shared):
+def plot_fits_against_grid_shared_slope(
+    df_grid, df_best_lr_bs, utds_to_predict, lr_reg_shared, bs_reg_shared
+):
     envs = get_envs(df_grid)
     utds = get_utds(df_grid)
 
@@ -313,9 +351,17 @@ def plot_fits_against_grid_shared_slope(df_grid, df_best_lr_bs, utds_to_predict,
 
 
 def _tabulate_proposed_hparams(
-    utds_to_predict, lr_predictions, bs_predictions, envs, outputs_dir=None, save_path=None, verbose=False
+    utds_to_predict,
+    lr_predictions,
+    bs_predictions,
+    envs,
+    outputs_dir=None,
+    save_path=None,
+    verbose=False,
 ):
-    assert (outputs_dir is None) == (save_path is None), 'Both outputs_dir and save_path must be provided or neither'
+    assert (outputs_dir is None) == (save_path is None), (
+        'Both outputs_dir and save_path must be provided or neither'
+    )
 
     proposed_hparams = {'Environment': [], 'UTD': [], 'Learning Rate': [], 'Batch Size': []}
 
@@ -335,10 +381,14 @@ def _tabulate_proposed_hparams(
 
     for col in proposed_hparams_df.columns:
         if 'Learning Rate' in col:
-            proposed_hparams_df[col] = proposed_hparams_df[col].apply(lambda x: f'{x:.2e}').astype(float)
+            proposed_hparams_df[col] = (
+                proposed_hparams_df[col].apply(lambda x: f'{x:.2e}').astype(float)
+            )
         if 'Batch Size' in col:
             proposed_hparams_df[col] = proposed_hparams_df[col].astype(int)
-            proposed_hparams_df[f'{col}(rounded)'] = (np.round(proposed_hparams_df[col] / 16) * 16).astype(int)
+            proposed_hparams_df[f'{col}(rounded)'] = np.maximum(
+                (np.round(proposed_hparams_df[col] / 16) * 16).astype(int), 16
+            )
 
     if verbose:
         pd.options.display.float_format = '{:.2e}'.format
@@ -360,18 +410,36 @@ def tabulate_proposed_hparams_separate_slope(
     lr_predictions = get_separate_slope_prediction(lr_regs, utds_to_predict, envs)
     bs_predictions = get_separate_slope_prediction(bs_regs, utds_to_predict, envs)
     return _tabulate_proposed_hparams(
-        utds_to_predict, lr_predictions, bs_predictions, envs, outputs_dir, f'{save_path}/separate', verbose
+        utds_to_predict,
+        lr_predictions,
+        bs_predictions,
+        envs,
+        outputs_dir,
+        f'{save_path}/separate',
+        verbose,
     )
 
 
 def tabulate_proposed_hparams_shared_slope(
-    df_grid, utds_to_predict, lr_reg_shared, bs_reg_shared, outputs_dir=None, save_path=None, verbose=False
+    df_grid,
+    utds_to_predict,
+    lr_reg_shared,
+    bs_reg_shared,
+    outputs_dir=None,
+    save_path=None,
+    verbose=False,
 ):
     envs = get_envs(df_grid)
     lr_predictions = get_shared_slope_predictions(lr_reg_shared, utds_to_predict, envs)
     bs_predictions = get_shared_slope_predictions(bs_reg_shared, utds_to_predict, envs)
     return _tabulate_proposed_hparams(
-        utds_to_predict, lr_predictions, bs_predictions, envs, outputs_dir, f'{save_path}/shared', verbose
+        utds_to_predict,
+        lr_predictions,
+        bs_predictions,
+        envs,
+        outputs_dir,
+        f'{save_path}/shared',
+        verbose,
     )
 
 
@@ -384,14 +452,20 @@ def tabulate_baseline_hparams(
 
     If `utd_at == 'middle'`, the utd_at is set to the geometric mean of the grid search.
     """
-    assert (outputs_dir is None) == (save_path is None), 'Both outputs_dir and save_path must be provided or neither'
+    assert (outputs_dir is None) == (save_path is None), (
+        'Both outputs_dir and save_path must be provided or neither'
+    )
 
     utds = get_utds(df_grid)
     envs = get_envs(df_grid)
     n_envs = len(envs)
     if utd_at == 'middle':
-        middle_utd = np.prod(utds_to_predict) ** (1 / len(utds_to_predict))  # Geometric mean of predicted UTDs
-        utd_at = min(utds, key=lambda x: abs(np.log(x) - np.log(middle_utd)))  # Snap to nearest utd_at in grid search
+        middle_utd = np.prod(utds_to_predict) ** (
+            1 / len(utds_to_predict)
+        )  # Geometric mean of predicted UTDs
+        utd_at = min(
+            utds, key=lambda x: abs(np.log(x) - np.log(middle_utd))
+        )  # Snap to nearest utd_at in grid search
     utd_at = float(utd_at)
     assert utd_at in utds, f'utd={utd_at} not found in grid search'
     print('Baseline based optimal hyperparamers at UTD', utd_at, '\n')
@@ -403,7 +477,9 @@ def tabulate_baseline_hparams(
 
     baseline_values_df['utd'] = [utds_to_predict] * n_envs
     baseline_values_df = baseline_values_df.explode('utd').reset_index(drop=True)
-    baseline_values_df = baseline_values_df[['env_name', 'utd', 'learning_rate', 'batch_size']].rename(
+    baseline_values_df = baseline_values_df[
+        ['env_name', 'utd', 'learning_rate', 'batch_size']
+    ].rename(
         columns={
             'env_name': 'Environment',
             'utd': 'UTD',
@@ -418,7 +494,9 @@ def tabulate_baseline_hparams(
         print(baseline_values_df, '\n')
 
     if outputs_dir is not None:
-        full_path = os.path.join(outputs_dir, 'grid_proposed_hparams', f'{save_path}/baseline_utd{utd_at}.csv')
+        full_path = os.path.join(
+            outputs_dir, 'grid_proposed_hparams', f'{save_path}/baseline_utd{utd_at}.csv'
+        )
         os.makedirs(os.path.dirname(full_path), exist_ok=True)
         baseline_values_df.to_csv(full_path, index=False)
 

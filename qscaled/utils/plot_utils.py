@@ -4,14 +4,24 @@ import seaborn as sns
 
 from typing import Tuple
 
-COLORS = ['#BBCC33', '#77AADD', '#44BB99', '#EEDD88', '#EE8866', '#FFAABB', '#99DDFF', '#AAAA00', '#DDDDDD']
+COLORS = [
+    '#BBCC33',
+    '#77AADD',
+    '#44BB99',
+    '#EEDD88',
+    '#EE8866',
+    '#FFAABB',
+    '#99DDFF',
+    '#AAAA00',
+    '#DDDDDD',
+]
 
 
 def make_smooth_x_range(xs):
     return np.logspace(np.log10(min(xs)), np.log10(max(xs)), 100)
 
 
-def set_theme():
+def set_theme(display_palette=False):
     plt.rcParams['text.usetex'] = False  # Let TeX do the typsetting
     plt.rcParams['text.latex.preamble'] = (
         r'\usepackage{sansmath} \sansmath'  # Force sans-serif math mode (for ax labels)
@@ -20,14 +30,15 @@ def set_theme():
     plt.rcParams['font.sans-serif'] = ['Helveta Nue']  # Choose a nice font here
     sns.set_style('whitegrid')
 
-    plt.figure(figsize=(9, 2))
-    for i, color in enumerate(COLORS):
-        plt.bar(i, 1, color=color, label=color)
-    plt.xticks([])
-    plt.yticks([])
-    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-    plt.title('Color Palette')
-    plt.show()
+    if display_palette:
+        plt.figure(figsize=(9, 2))
+        for i, color in enumerate(COLORS):
+            plt.bar(i, 1, color=color, label=color)
+        plt.xticks([])
+        plt.yticks([])
+        plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        plt.title('Color Palette')
+        plt.show()
 
 
 def ax_set_x_bounds_and_scale(

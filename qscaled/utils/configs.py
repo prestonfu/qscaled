@@ -12,9 +12,10 @@ class BaseConfig:
     thresholds: List[int] = field(
         default_factory=lambda: [100, 200, 300, 400, 500, 600, 700, 800]
     )  # Return thresholds out of 1000
-    wandb_collector: Optional[BaseCollector] = None  # Wandb run collector; None if loading from zip directly
-    env_step_freq: Optional[int] = None  # Takes Wandb data every n steps
-    env_step_start: Optional[int] = None  # Takes Wandb data starting from this step
+    wandb_collector: Optional[BaseCollector] = (
+        None  # Wandb run collector; None if loading from zip directly
+    )
+    logging_freq: Optional[int] = None  # Rounds env steps up to nearest multiple of logging_freq
 
 
 @dataclass(kw_only=True)

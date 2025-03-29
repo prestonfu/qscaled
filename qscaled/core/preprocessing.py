@@ -9,8 +9,6 @@ from sklearn.isotonic import IsotonicRegression
 
 from qscaled.constants import QSCALED_PATH
 
-np.random.seed(42)
-
 
 def bootstrap_crossings(df, thresholds, filename: str, use_cached=True):
     bootstrap_cache_file = os.path.join(QSCALED_PATH, 'bootstrap_results', f'{filename}.pkl')
@@ -34,7 +32,9 @@ def bootstrap_crossings(df, thresholds, filename: str, use_cached=True):
         for threshold in thresholds:
             # Get crossing from isotonic regression
             crossing_idx = np.where(row['return_isotonic'] > threshold)[0]
-            row_crossings.append(row['training_step'][crossing_idx[0]] if len(crossing_idx) > 0 else np.nan)
+            row_crossings.append(
+                row['training_step'][crossing_idx[0]] if len(crossing_idx) > 0 else np.nan
+            )
 
         crossings_array.append(row_crossings)
 
@@ -47,11 +47,14 @@ def bootstrap_crossings(df, thresholds, filename: str, use_cached=True):
             iso_reg_stds = results['iso_reg_stds']
             crossings = results['crossings']
             crossings_std = results['crossings_std']
+
     else:
 
         def _compute_nanstd(sample_crossings):
             with warnings.catch_warnings(record=True) as w:
-                warnings.simplefilter('always', category=RuntimeWarning)  # Catch all RuntimeWarnings
+                warnings.simplefilter(
+                    'always', category=RuntimeWarning
+                )  # Catch all RuntimeWarnings
                 crossings_std = np.nanstd(sample_crossings, axis=0)
                 for warning in w:
                     if 'Degrees of freedom <= 0 for slice' in str(warning.message):
@@ -63,7 +66,6 @@ def bootstrap_crossings(df, thresholds, filename: str, use_cached=True):
                             UserWarning,
                         )
                     print(warning.message)
-
                 return crossings_std
 
         iso_reg = []
@@ -78,8 +80,12 @@ def bootstrap_crossings(df, thresholds, filename: str, use_cached=True):
             sample_crossings = []
             for _ in range(n_bootstrap):
                 # Sample with replacement
-                sample_indices = np.random.randint(0, row['return'].shape[1], size=row['return'].shape[1])
-                y = np.mean(row['return'][:, sample_indices], axis=1)  # Average the bootstrap samples
+                sample_indices = np.random.randint(
+                    0, row['return'].shape[1], size=row['return'].shape[1]
+                )
+                y = np.mean(
+                    row['return'][:, sample_indices], axis=1
+                )  # Average the bootstrap samples
 
                 # Fit isotonic regression on this bootstrap sample
                 ir.fit(x, y)
@@ -90,7 +96,9 @@ def bootstrap_crossings(df, thresholds, filename: str, use_cached=True):
                 sample_crossing = []
                 for threshold in thresholds:
                     crossing_idx = np.where(y_iso > threshold)[0]
-                    crossing = row['training_step'][crossing_idx[0]] if len(crossing_idx) > 0 else np.nan
+                    crossing = (
+                        row['training_step'][crossing_idx[0]] if len(crossing_idx) > 0 else np.nan
+                    )
                     sample_crossing.append(crossing)
                 sample_crossings.append(sample_crossing)
 
@@ -146,7 +154,9 @@ def select_middle_bs_lr(df):
                 batch_sizes = sorted(utd_data['batch_size'].unique())
                 mid_bs = batch_sizes[len(batch_sizes) // 2]
 
-                row = utd_data[(utd_data['learning_rate'] == mid_lr) & (utd_data['batch_size'] == mid_bs)]
+                row = utd_data[
+                    (utd_data['learning_rate'] == mid_lr) & (utd_data['batch_size'] == mid_bs)
+                ]
 
                 if len(row) > 0:
                     filtered_rows.append(row.iloc[0])

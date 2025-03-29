@@ -35,7 +35,9 @@ def _plot_per_lr_or_bs(df, thresholds, group_name):
     for group_value in group_values:
         colors = sns.color_palette('viridis', n_colors=len(param_values))
         fig, axes = plt.subplots(n_utds, n_envs, figsize=(3.5 * n_envs, 2.5 * n_utds))
-        fig.suptitle(f'Learning Curves by Environment and UTD Ratio ({description} = {group_value})')
+        fig.suptitle(
+            f'Learning Curves by Environment and UTD Ratio ({description} = {group_value})'
+        )
 
         lines = []
         labels = []
@@ -66,17 +68,28 @@ def _plot_per_lr_or_bs(df, thresholds, group_name):
 
                     label = f'{param_key}={row[param_key]}'
                     line = ax.plot(
-                        row['training_step'], row['mean_return'], alpha=0.3, color=colors[config_colors[config]]
+                        row['training_step'],
+                        row['mean_return'],
+                        alpha=0.3,
+                        color=colors[config_colors[config]],
                     )
                     line = ax.plot(
-                        row['training_step'], row['return_isotonic'], alpha=1, color=colors[config_colors[config]]
+                        row['training_step'],
+                        row['return_isotonic'],
+                        alpha=1,
+                        color=colors[config_colors[config]],
                     )
 
                     # use the crossings column to plot crossings
                     for k, threshold in enumerate(thresholds):
                         crossing_x = row['crossings'][k]
                         crossing_y = threshold
-                        ax.plot(crossing_x, crossing_y, 'o', color=colors[config_colors[config] % len(colors)])
+                        ax.plot(
+                            crossing_x,
+                            crossing_y,
+                            'o',
+                            color=colors[config_colors[config] % len(colors)],
+                        )
 
                     # Plot crossing standard deviations as error bars
                     for k, threshold in enumerate(thresholds):
@@ -104,13 +117,23 @@ def _plot_per_lr_or_bs(df, thresholds, group_name):
 
         # Sort labels by learning rate
         sorted_indices = [
-            i for i, _ in sorted(enumerate(labels), key=lambda x: float(x[1].replace(f'{param_key}=', '')))
+            i
+            for i, _ in sorted(
+                enumerate(labels), key=lambda x: float(x[1].replace(f'{param_key}=', ''))
+            )
         ]
         lines = [lines[i] for i in sorted_indices]
         labels = [labels[i] for i in sorted_indices]
 
         # Create a single legend outside all subplots
-        fig.legend(lines, labels, bbox_to_anchor=(0.5, 0), loc='upper center', ncol=(len(labels)), fontsize=12)
+        fig.legend(
+            lines,
+            labels,
+            bbox_to_anchor=(0.5, 0),
+            loc='upper center',
+            ncol=(len(labels)),
+            fontsize=12,
+        )
         plt.tight_layout()
         plt.show()
 

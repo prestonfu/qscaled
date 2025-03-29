@@ -10,9 +10,7 @@ from typing import Dict, List, Tuple, Any
 from tqdm import tqdm
 from multiprocessing.pool import ThreadPool
 
-from qscaled.constants import QSCALED_PATH
-
-np.random.seed(42)
+from qscaled.constants import QSCALED_PATH, suppress_overwrite_prompt
 
 api = wandb.Api(timeout=120)
 
@@ -27,7 +25,7 @@ class BaseCollector(abc.ABC):
         wandb_entity: str,
         wandb_project: str,
         wandb_tags: List[str] | str = [],
-        use_cache: bool = True,
+        use_cached: bool = True,
         parallel: bool = True,
     ):
         """
@@ -36,7 +34,7 @@ class BaseCollector(abc.ABC):
         Args:
         * `wandb_tags`: List of wandb tags to filter runs by. If empty list, all
           runs are collected from wandb. If `None`, no runs are collected.
-        * `use_cache`: If true, loads pre-existing data from memory. Otherwise,
+        * `use_cached`: If true, loads pre-existing data from memory. Otherwise,
           fetches data from wandb.
         * `parallel`: If true, fetches data from wandb in parallel.
 
@@ -52,10 +50,11 @@ class BaseCollector(abc.ABC):
         self._metadatas = defaultdict(list)
         self._rundatas = defaultdict(list)
         self._hparams = []
+        self._set_env_step_key()
         self._set_hparams()
         self._set_wandb_metrics()
         if wandb_tags is not None:
-            self._fetch_data(wandb_tags, use_cache, parallel)
+            self._fetch_data(wandb_tags, use_cached, parallel)
 
     @abc.abstractmethod
     def _set_hparams(self):
@@ -97,15 +96,18 @@ class BaseCollector(abc.ABC):
         """
         raise NotImplementedError
 
+    def _set_env_step_key(self):
+        self._env_step_key = '_step'
+
     def keys(self):
         return list(self._rundatas.keys())
 
     @property
-    def num_hparams(self):
+    def _num_hparams(self):
         return len(self._hparams)
 
     @property
-    def hparam_index(self):
+    def _hparam_index(self):
         return {hparam: i for i, hparam in enumerate(self._hparams)}
 
     def _insert_wandb_run(self, run, verbose=False):
@@ -135,14 +137,25 @@ class BaseCollector(abc.ABC):
     def save_state(self, tag):
         """Turns out pickle/gzip is very slow, so we use numpy."""
         state = [self._metadatas, self._rundatas]
-        np.save(os.path.join(self._path, tag + '.npy'), state)
+        save_path = os.path.join(self._path, tag + '.npy')
+        if os.path.exists(save_path) and not suppress_overwrite_prompt:
+            response = input(
+                f'File {save_path} already exists. Remove and overwrite? (y/N): '
+            ).lower()
+            if response == 'y':
+                os.remove(save_path)
+            else:
+                print('Cancelling operation.')
+                exit(0)
+        np.save(save_path, state)
 
     def sample(self):
         """
         Samples a key uniformly at random. Returns the key with its corresponding
         metadata and rundata.
         """
-        sampled_key = self.keys[np.random.choice(len(self.keys))]
+        keys = self.keys()
+        sampled_key = keys[np.random.choice(len(keys))]
         return sampled_key, self._metadatas[sampled_key], self._rundatas[sampled_key]
 
     def get_unique(self, hparam, *args, **kw):
@@ -151,7 +164,9 @@ class BaseCollector(abc.ABC):
         See `filter` for more details.
         """
         if hparam not in self._hparam_index:
-            raise ValueError(f'Invalid hparam: {hparam}. Must be one of {list(self._hparam_index.keys())}.')
+            raise ValueError(
+                f'Invalid hparam: {hparam}. Must be one of {list(self._hparam_index.keys())}.'
+            )
         filtered_rundatas = self.filter(*args, **kw)
         idx = self._hparam_index[hparam]
         unique = set(key[idx] for key in filtered_rundatas.keys())
@@ -165,7 +180,7 @@ class BaseCollector(abc.ABC):
 
     def _dummy_key_factory(self, *args, **kw):
         """Create a dummy key with DUMMY_VALUE for unspecified hparams."""
-        params = [BaseCollector.DUMMY_VALUE] * self.num_hparams
+        params = [BaseCollector.DUMMY_VALUE] * self._num_hparams
         for i, value in enumerate(args):
             params[i] = value
         for hparam, value in kw.items():
@@ -183,7 +198,7 @@ class BaseCollector(abc.ABC):
 
     def _get_filtered_keys(self, *args, **kw):
         """Returns a list of keys that satisfy the constraints specified by args, kw."""
-        return [key for key in self.keys if self._check_key(key, *args, **kw)]
+        return [key for key in self.keys() if self._check_key(key, *args, **kw)]
 
     def _get_filtered_datas(self, *args, **kw) -> Tuple[Dict, Dict]:
         """Returns two dictionaries: metadata and rundata."""
@@ -210,7 +225,7 @@ class BaseCollector(abc.ABC):
         the key has `a='foo'` and `c='bar'`.
         """
         metadatas, rundatas = self._get_filtered_datas(*args, **kw)
-        collector = self.__class__(self.entity, self.project, wandb_tags=None)
+        collector = self.__class__(self._wandb_entity, self._wandb_project, wandb_tags=None)
         collector._metadatas = metadatas
         collector._rundatas = rundatas
         return collector
@@ -226,7 +241,9 @@ class BaseCollector(abc.ABC):
             metadatas = self._metadatas[key]
             rundatas = self._rundatas[key]
             if len(rundatas) > num_seeds:
-                metric_vals = [(i, rundata[compare_metric].mean()) for i, rundata in enumerate(rundatas)]
+                metric_vals = [
+                    (i, rundata[compare_metric].mean()) for i, rundata in enumerate(rundatas)
+                ]
                 metric_vals = sorted(metric_vals, key=comparator)
                 idx = [i for i, rundata in metric_vals]
                 self._metadatas[key] = [metadatas[idx[j]] for j in range(num_seeds)]
@@ -242,9 +259,9 @@ class BaseCollector(abc.ABC):
         """
         Merge multiple BaseCollector-inherited objects of the same class.
 
-        Warning: Merging collectors from different projects or entities is
-        possible, but the resulting collector will have None for entity and
-        project. Thus, `_insert` will not work for the merged collector.
+        Merging collectors from different projects or entities is possible,
+        but the resulting collector will have `None` for entity and
+        project. Thus, `_fetch_data` will not work for the merged collector.
         """
         assert len(collectors) > 0
         shared_cls = collectors[0].__class__
@@ -254,7 +271,10 @@ class BaseCollector(abc.ABC):
 
         collector = deepcopy(collectors[0])
         for other in collectors[1:]:
-            if other._wandb_entity != collector._wandb_entity or other._wandb_project != collector._wandb_project:
+            if (
+                other._wandb_entity != collector._wandb_entity
+                or other._wandb_project != collector._wandb_project
+            ):
                 collector._wandb_entity = None
                 collector._wandb_project = None
             for key in collector.keys():
@@ -263,13 +283,17 @@ class BaseCollector(abc.ABC):
         return collector
 
     def _fetch_data(
-        self, wandb_tags: List[str] | str = [], use_cache: bool = True, parallel: bool = True, verbose: bool = False
+        self,
+        wandb_tags: List[str] | str = [],
+        use_cached: bool = True,
+        parallel: bool = True,
+        verbose: bool = False,
     ):
         """
         Args:
         * `wandb_tags`: List of wandb tags to filter runs by. If empty, all runs
           are collected from wandb.
-        * `use_cache`: If true, loads pre-existing data from memory. Otherwise, fetches
+        * `use_cached`: If true, loads pre-existing data from memory. Otherwise, fetches
           data from wandb.
         * `parallel`: If true, fetches data from wandb in parallel with half the
           number of cores.
@@ -280,13 +304,15 @@ class BaseCollector(abc.ABC):
         elif isinstance(wandb_tags, str):
             wandb_tags = [wandb_tags]
 
-        collector_factory = lambda: self.__class__(self._wandb_entity, self._wandb_project, wandb_tags=None)
+        collector_factory = lambda: self.__class__(
+            self._wandb_entity, self._wandb_project, wandb_tags=None
+        )
         collectors = []
 
         for tag in wandb_tags:
             collector = collector_factory()
 
-            if use_cache and os.path.exists(os.path.join(self._path, tag + '.npy')):
+            if use_cached and os.path.exists(os.path.join(self._path, tag + '.npy')):
                 collector.load_state(tag)
             else:
                 wandb_str = f'{self._wandb_entity}/{self._wandb_project}'
@@ -299,7 +325,6 @@ class BaseCollector(abc.ABC):
 
                 runs = api.runs(f'{collector._wandb_entity}/{collector._wandb_project}', tag_filter)
                 insert_verbose = lambda run: collector._insert_wandb_run(run, verbose)
-
                 if parallel:
                     with ThreadPool(int(os.cpu_count() * 0.5)) as pool:
                         list(tqdm(pool.imap(insert_verbose, runs), total=len(runs), desc=tqdm_desc))
@@ -307,20 +332,27 @@ class BaseCollector(abc.ABC):
                     for run in tqdm(runs, total=len(runs), desc=tqdm_desc):
                         insert_verbose(run)
 
-            collector.save_state(tag)
+                collector.save_state(tag)
+
             collectors.append(collector)
 
         combined_collector = self.__class__.merge(*collectors)
         self.copy_state(combined_collector)
 
-    def _resolve_logging_freq(self, df: pd.DataFrame, logging_freq):
+    def _resolve_logging_freq(self, df: pd.DataFrame, logging_freq: int):
         """
         Resolves non-uniform logging frequencies. Rounds step up to nearest
         multiple of `logging_freq`, then averages over potential duplicates.
         Since performance is usually increasing, in general the output
         will be more conservative than the input.
+
+        Useful in cases where merging data from multiple runs with different
+        logging frequencies.
         """
         df = df.copy()
-        df['rounded_step'] = np.ceil(df['_step'] / logging_freq) * logging_freq
-        agg_dict = {'_step': 'first', **{col: 'mean' for col in df.columns if col.startswith('seed')}}
+        df['rounded_step'] = np.ceil(df[self._env_step_key] / logging_freq) * logging_freq
+        agg_dict = {
+            self._env_step_key: 'first',
+            **{col: 'mean' for col in df.columns if col.startswith('seed')},
+        }
         return df.groupby('rounded_step').agg(agg_dict).dropna().reset_index(drop=True)

@@ -25,7 +25,13 @@ def plot_per_env_utd(ours_df, baseline_df, thresholds):
                 for _, row in subset.iterrows():
                     # ax_label = f"{label}: bs={row['batch_size']}, lr={row['learning_rate']}"
                     ax.plot(row['training_step'], row['mean_return'], color=color, alpha=0.3)
-                    ax.plot(row['training_step'], row['return_isotonic'], color=color, alpha=1, label=label)
+                    ax.plot(
+                        row['training_step'],
+                        row['return_isotonic'],
+                        color=color,
+                        alpha=1,
+                        label=label,
+                    )
 
                     # use the crossings column to plot crossings
                     for k, threshold in enumerate(thresholds):
@@ -38,7 +44,9 @@ def plot_per_env_utd(ours_df, baseline_df, thresholds):
                         crossing_x = row['crossings'][k]
                         crossing_y = threshold
                         crossing_std = row['crossings_std'][k]
-                        ax.errorbar(crossing_x, crossing_y, xerr=crossing_std, capsize=3, color=color)
+                        ax.errorbar(
+                            crossing_x, crossing_y, xerr=crossing_std, capsize=3, color=color
+                        )
 
                 ax.set_xlabel('Steps')
                 ax.set_ylabel('Return')

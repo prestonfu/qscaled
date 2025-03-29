@@ -9,7 +9,12 @@ from rliable import plot_utils
 from matplotlib.lines import Line2D
 
 from qscaled.utils.power_law import fit_powerlaw, power_law_with_const
-from qscaled.utils.plot_utils import make_smooth_x_range, ax_set_x_bounds_and_scale, ax_set_y_bounds_and_scale, COLORS
+from qscaled.utils.plot_utils import (
+    make_smooth_x_range,
+    ax_set_x_bounds_and_scale,
+    ax_set_y_bounds_and_scale,
+    COLORS,
+)
 
 
 def compute_data_efficiency_per_env(df, envs):
@@ -59,7 +64,11 @@ def compute_normalized_times(data_efficiency_dict, envs):
     Implements Appendix D of the paper.
     """
     median_times = np.array(
-        [np.median(list(zip(*data_efficiency_dict[env]))[1]) for env in envs if len(data_efficiency_dict[env]) > 0]
+        [
+            np.median(list(zip(*data_efficiency_dict[env]))[1])
+            for env in envs
+            if len(data_efficiency_dict[env]) > 0
+        ]
     )
     median_median = np.median(median_times)
     scaling = 1 / median_times
@@ -75,7 +84,9 @@ def compute_normalized_times(data_efficiency_dict, envs):
     return np.array(normalized_times_all), mean_normalized_times, median_median
 
 
-def plot_data_efficiency_averaged(ours_mean_normalized_times, baseline_mean_normalized_times, utds, thresholds):
+def plot_data_efficiency_averaged(
+    ours_mean_normalized_times, baseline_mean_normalized_times, utds, thresholds
+):
     n_thresholds = len(thresholds)
     colors = sns.color_palette('viridis', n_colors=n_thresholds)
 
@@ -121,8 +132,12 @@ def plot_data_efficiency_averaged(ours_mean_normalized_times, baseline_mean_norm
     plt.show()
 
 
-def make_data_pareto_fits(mean_normalized_times, utds, n_thresholds, output_dir=None, save_name=None):
-    assert (output_dir is not None) == (save_name is not None), 'Both output_dir and save_name must be provided or not'
+def make_data_pareto_fits(
+    mean_normalized_times, utds, n_thresholds, output_dir=None, save_name=None
+):
+    assert (output_dir is not None) == (save_name is not None), (
+        'Both output_dir and save_name must be provided or not'
+    )
 
     fits = []
     for i in tqdm(range(n_thresholds)):
@@ -218,7 +233,11 @@ def plot_clean_utd_data_pareto_fit(
 
     if show_baseline:
         baseline_fit_line, baseline_asymptote_line = helper(
-            baseline_median_median, baseline_fits, baseline_normalized_times_all, color=COLORS[4], label='Baseline'
+            baseline_median_median,
+            baseline_fits,
+            baseline_normalized_times_all,
+            color=COLORS[4],
+            label='Baseline',
         )
         lines.append(baseline_fit_line)
         labels.append('Constant fit $\mathcal{D}_J(\sigma)$')

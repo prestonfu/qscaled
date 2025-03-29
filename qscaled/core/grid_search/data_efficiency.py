@@ -70,7 +70,11 @@ def plot_averaged_data_efficiency(closest_data_efficiency_dict):
     plt.figure(figsize=(9, 6))
 
     median_times = np.array(
-        [np.median(list(zip(*data))[1]) for data in closest_data_efficiency_dict.values() if len(data) > 0]
+        [
+            np.median(list(zip(*data))[1])
+            for data in closest_data_efficiency_dict.values()
+            if len(data) > 0
+        ]
     )
     scaling = 1 / median_times
 
@@ -85,7 +89,9 @@ def plot_averaged_data_efficiency(closest_data_efficiency_dict):
     # Calculate and plot the average across all environments
     normalized_times_all = np.array(normalized_times_all)
 
-    plt.plot(utds, np.mean(normalized_times_all, axis=0), 'ko', linewidth=3, label='Average', alpha=0.8)
+    plt.plot(
+        utds, np.mean(normalized_times_all, axis=0), 'ko', linewidth=3, label='Average', alpha=0.8
+    )
 
     # Fit a line to log-transformed data
     log_utds = np.log(utds)
@@ -102,7 +108,13 @@ def plot_averaged_data_efficiency(closest_data_efficiency_dict):
     a, b, c = fit_powerlaw(utds, mean_times)
     x_smooth = np.logspace(np.log10(min(utds)), np.log10(max(utds)), 100)
     y_fitted_powerlaw = power_law_with_const(x_smooth, a, b, c)
-    plt.plot(x_smooth, y_fitted_powerlaw, linewidth=2, label=f'y = {c:.2f} + (x/{b:.2f})^-{a:.2f}', color='blue')
+    plt.plot(
+        x_smooth,
+        y_fitted_powerlaw,
+        linewidth=2,
+        label=f'y = {c:.2f} + (x/{b:.2f})^-{a:.2f}',
+        color='blue',
+    )
 
     plt.xlabel('Updates per Data point (UTD)')
     plt.ylabel('Normalized Time to Threshold')
