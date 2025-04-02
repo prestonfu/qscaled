@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from qscaled.core.preprocessing import get_envs, get_utds
-from qscaled.utils.power_law import fit_powerlaw, power_law_with_const
+from qscaled.utils import power_law
 
 
 def plot_closest_data_efficiency(df_grid, proposed_hparams):
@@ -105,9 +105,9 @@ def plot_averaged_data_efficiency(closest_data_efficiency_dict):
 
     # Plot fit curve
     mean_times = np.mean(normalized_times_all, axis=0)
-    a, b, c = fit_powerlaw(utds, mean_times)
+    a, b, c = power_law.fit_powerlaw(utds, mean_times)
     x_smooth = np.logspace(np.log10(min(utds)), np.log10(max(utds)), 100)
-    y_fitted_powerlaw = power_law_with_const(x_smooth, a, b, c)
+    y_fitted_powerlaw = power_law.power_law_with_const(x_smooth, a, b, c)
     plt.plot(
         x_smooth,
         y_fitted_powerlaw,

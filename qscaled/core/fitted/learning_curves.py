@@ -51,8 +51,7 @@ def plot_per_env_utd(ours_df, baseline_df, thresholds):
                 ax.set_xlabel('Steps')
                 ax.set_ylabel('Return')
                 ax.grid(True)
-                ax.set_facecolor('#f0f0f0')
-                ax.legend()
+                ax.legend(frameon=False)
 
     helper(axes, ours_df, 'Ours', 'tab:blue')
     helper(axes, baseline_df, 'Baseline', 'tab:orange')

@@ -1,9 +1,9 @@
 import numpy as np
 import pandas as pd
 from functools import reduce
-from typing import Dict, Tuple, List, Any
+from typing import Dict, Tuple, List, Union, Any
 
-from qscaled.wandb_utils import flatten_dict, retry, get_dict_value
+from qscaled.wandb_utils import flatten_dict, get_dict_value, get_wandb_run_history
 from qscaled.wandb_utils.base_collector import BaseCollector
 
 
@@ -14,7 +14,7 @@ class OneSeedPerRunCollector(BaseCollector):
         self,
         wandb_entity: str,
         wandb_project: str,
-        wandb_tags: List[str] | str = [],
+        wandb_tags: Union[List[str], str] = [],
         use_cached: bool = True,
         parallel: bool = True,
     ):
@@ -39,7 +39,7 @@ class OneSeedPerRunCollector(BaseCollector):
                 if step_count < thresh * max_step_count:
                     rundatas.pop(i)
 
-    def prepare_zip_export_data(self, metric, logging_freq=None) -> Dict[Any, np.typing.NDArray]:
+    def prepare_zip_export_data(self, metric, logging_freq=None) -> Dict[Any, np.ndarray]:
         data_dict = {}
         merge_fn = lambda l, r: pd.merge(l, r, on=self._env_step_key, how='outer')
 
@@ -72,7 +72,7 @@ class ExampleOneSeedPerRunCollector(OneSeedPerRunCollector):
         self,
         wandb_entity: str,
         wandb_project: str,
-        wandb_tags: List[str] | str = [],
+        wandb_tags: Union[List[str], str] = [],
         use_cached: bool = True,
         parallel: bool = True,
     ):
@@ -105,22 +105,19 @@ class ExampleOneSeedPerRunCollector(OneSeedPerRunCollector):
         key = (env, utd, batch_size, learning_rate)  # key is given in same order as `self._hparams`
         return key
 
-    def wandb_fetch(self, run, num_tries=5) -> Tuple[Dict[str, Any], pd.DataFrame]:
-        @retry(num_tries)
-        def helper(config):
-            df = run.history(samples=10000)
-            keys = [self._env_step_key] + self._wandb_metrics
-            df = df[keys]
-            metadata = {
-                'id': run.id,
-                'name': get_dict_value(config, ['logging.exp_name', 'exp_name']),
-                'group': get_dict_value(config, ['logging.group', 'wandb_group']),
-                'runtime_mins': float(run.summary['_runtime'] / 60),
-                'last_step': df[self._env_step_key].iloc[-1],
-            }
-            if len(df) >= 10:
-                return metadata, df
-            else:
-                return None
-
-        return helper(flatten_dict(run.config))
+    def wandb_fetch(self, run) -> Tuple[Dict[str, Any], pd.DataFrame]:
+        config = flatten_dict(run.config)
+        result = get_wandb_run_history(run)
+        if result is None or len(result) < 10:
+            return None
+        df = result
+        keys = [self._env_step_key] + self._wandb_metrics
+        df = df[keys]
+        metadata = {
+            'id': run.id,
+            'name': get_dict_value(config, ['logging.exp_name', 'exp_name']),
+            'group': get_dict_value(config, ['logging.group', 'wandb_group']),
+            'runtime_mins': float(run.summary['_runtime'] / 60),
+            'last_step': df[self._env_step_key].iloc[-1],
+        }
+        return metadata, df

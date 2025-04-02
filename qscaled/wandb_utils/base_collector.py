@@ -1,30 +1,27 @@
 import os
 import abc
 import numpy as np
-import wandb
 import pandas as pd
 
 from copy import deepcopy
 from collections import defaultdict
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Tuple, Union, Any
 from tqdm import tqdm
 from multiprocessing.pool import ThreadPool
 
 from qscaled.constants import QSCALED_PATH, suppress_overwrite_prompt
-
-api = wandb.Api(timeout=120)
+from qscaled.utils.state import remove_with_prompt
+from qscaled.wandb_utils import retry
 
 
 class BaseCollector(abc.ABC):
     """Base class for efficiently collecting run data using tags from WandB."""
 
-    DUMMY_VALUE = 'Wandb collector dummy value'
-
     def __init__(
         self,
         wandb_entity: str,
         wandb_project: str,
-        wandb_tags: List[str] | str = [],
+        wandb_tags: Union[List[str], str] = [],
         use_cached: bool = True,
         parallel: bool = True,
     ):
@@ -43,8 +40,11 @@ class BaseCollector(abc.ABC):
         * `_metadatas` maps keys to lists of metadata dictionaries.
         * `_rundatas` maps keys to lists of dataframes.
         """
+        import wandb
+
         self._wandb_entity = wandb_entity
         self._wandb_project = wandb_project
+        self._wandb_api = wandb.Api(timeout=120)
         self._path = os.path.join(QSCALED_PATH, 'collector', f'{wandb_entity}:{wandb_project}')
         os.makedirs(self._path, exist_ok=True)
         self._metadatas = defaultdict(list)
@@ -76,16 +76,15 @@ class BaseCollector(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def wandb_fetch(self, run, num_tries=5) -> Tuple[Dict[str, Any], pd.DataFrame] | None:
+    def wandb_fetch(self, run) -> Union[Tuple[Dict[str, Any], pd.DataFrame], None]:
         """
-        If the run fails to fetch from the wandb api after `num_tries` attempts,
-        returns `None`. If the run is fetched successfully, returns a tuple of
-        metadata and history.
+        If the run fails to fetch from the wandb api returns `None`. If the run
+        is fetched successfully, returns a tuple of metadata and history.
         """
         raise NotImplementedError
 
     @abc.abstractmethod
-    def prepare_zip_export_data(self, metric, logging_freq=None) -> Dict[Any, np.typing.NDArray]:
+    def prepare_zip_export_data(self, metric, logging_freq=None):
         """
         Prepares output for `ZipHandler`. Returns a dictionary mapping
         collector keys to a single `pd.DataFrame`, filtered on the given env
@@ -101,6 +100,14 @@ class BaseCollector(abc.ABC):
 
     def keys(self):
         return list(self._rundatas.keys())
+    
+    def __len__(self):
+        """Number of distinct keys."""
+        return len(self.keys())
+    
+    def size(self):
+        """Number of distinct runs."""
+        return sum(len(rundatas) for rundatas in self._rundatas.values())
 
     @property
     def _num_hparams(self):
@@ -138,27 +145,21 @@ class BaseCollector(abc.ABC):
         """Turns out pickle/gzip is very slow, so we use numpy."""
         state = [self._metadatas, self._rundatas]
         save_path = os.path.join(self._path, tag + '.npy')
-        if os.path.exists(save_path) and not suppress_overwrite_prompt:
-            response = input(
-                f'File {save_path} already exists. Remove and overwrite? (y/N): '
-            ).lower()
-            if response == 'y':
-                os.remove(save_path)
-            else:
-                print('Cancelling operation.')
-                exit(0)
+        remove_with_prompt(save_path)
         np.save(save_path, state)
 
     def sample(self):
         """
         Samples a key uniformly at random. Returns the key with its corresponding
         metadata and rundata.
+
+        Useful e.g. if your collector only contains one key.
         """
         keys = self.keys()
         sampled_key = keys[np.random.choice(len(keys))]
         return sampled_key, self._metadatas[sampled_key], self._rundatas[sampled_key]
 
-    def get_unique(self, hparam, *args, **kw):
+    def get_unique(self, hparam, filter_str: str = None):
         """
         Find unique keys in hparam subject to constraints (default none).
         See `filter` for more details.
@@ -167,7 +168,7 @@ class BaseCollector(abc.ABC):
             raise ValueError(
                 f'Invalid hparam: {hparam}. Must be one of {list(self._hparam_index.keys())}.'
             )
-        filtered_rundatas = self.filter(*args, **kw)
+        filtered_rundatas = self.filter(filter_str)
         idx = self._hparam_index[hparam]
         unique = set(key[idx] for key in filtered_rundatas.keys())
         return sorted(list(unique))
@@ -178,53 +179,42 @@ class BaseCollector(abc.ABC):
     def get_rundatas(self):
         return deepcopy(self._rundatas)
 
-    def _dummy_key_factory(self, *args, **kw):
-        """Create a dummy key with DUMMY_VALUE for unspecified hparams."""
-        params = [BaseCollector.DUMMY_VALUE] * self._num_hparams
-        for i, value in enumerate(args):
-            params[i] = value
-        for hparam, value in kw.items():
-            assert hparam in self._hparams and self._hparam_index[hparam] >= len(args)
-            params[self._hparam_index[hparam]] = value
-        return tuple(params)
+    def _get_filtered_keys(self, filter_str: str = None):
+        keys = self.keys()
+        if not filter_str:
+            return keys
+        if not keys:
+            df = pd.DataFrame(columns=self._hparams)
+        else:
+            df = pd.DataFrame(keys, columns=self._hparams)
+        return [tuple(row) for _, row in df.query(filter_str).iterrows()]    
 
-    def _check_key(self, key: Tuple, *args, **kw):
-        """Check whether check_key satisfies the constraints specified by args, kw."""
-        template_key = self._dummy_key_factory(*args, **kw)
-        for check, template in zip(key, template_key):
-            if template not in (BaseCollector.DUMMY_VALUE, check):
-                return False
-        return True
-
-    def _get_filtered_keys(self, *args, **kw):
-        """Returns a list of keys that satisfy the constraints specified by args, kw."""
-        return [key for key in self.keys() if self._check_key(key, *args, **kw)]
-
-    def _get_filtered_datas(self, *args, **kw) -> Tuple[Dict, Dict]:
+    def _get_filtered_datas(self, filter_str: str = None) -> Tuple[Dict, Dict]:
         """Returns two dictionaries: metadata and rundata."""
-        filtered_keys = self._get_filtered_keys(*args, **kw)
+        filtered_keys = self._get_filtered_keys(filter_str)
         metadatas = {key: self._metadatas[key] for key in filtered_keys}
         rundatas = {key: self._rundatas[key] for key in filtered_keys}
         return metadatas, rundatas
 
-    def get_filtered_metadatas(self, *args, **kw):
+    def get_filtered_metadatas(self, filter_str: str = None):
         """Returns a dictionary of metadata that satisfy the constraints specified by args, kw."""
-        return self._get_filtered_datas(*args, **kw)[0]
+        return deepcopy(self._get_filtered_datas(filter_str)[0])
 
-    def get_filtered_rundatas(self, *args, **kw):
+    def get_filtered_rundatas(self, filter_str: str = None):
         """Returns a dictionary of rundata that satisfy the constraints specified by args, kw."""
-        return self._get_filtered_datas(*args, **kw)[1]
+        return deepcopy(self._get_filtered_datas(filter_str)[1])
 
-    def filter(self, *args, **kw):
+    def filter(self, filter_str: str):
         """
-        Filters the collector by the constraints specified by args and kw.
-        Returns a collector of the same class.
+        Filters the collector by the constraints specified by `filter_str`,
+        a thin wrapper around `pd.DataFrame.query`. Returns a collector of the 
+        same class.
 
         For example, if the collector has keys `(a, b, c)` and the user calls
-        `filter('foo', c='bar')`, the collector will return all data where
-        the key has `a='foo'` and `c='bar'`.
+        `filter('a>1 and c=="foo"')`, the collector will return all data where
+        the key has `a>1` and `c=="foo"`.
         """
-        metadatas, rundatas = self._get_filtered_datas(*args, **kw)
+        metadatas, rundatas = self._get_filtered_datas(filter_str)
         collector = self.__class__(self._wandb_entity, self._wandb_project, wandb_tags=None)
         collector._metadatas = metadatas
         collector._rundatas = rundatas
@@ -284,7 +274,7 @@ class BaseCollector(abc.ABC):
 
     def _fetch_data(
         self,
-        wandb_tags: List[str] | str = [],
+        wandb_tags: Union[List[str], str] = [],
         use_cached: bool = True,
         parallel: bool = True,
         verbose: bool = False,
@@ -323,7 +313,9 @@ class BaseCollector(abc.ABC):
                     tag_filter = {'tags': {'$in': [tag]}}
                     tqdm_desc = f'{wandb_str}: {tag}'
 
-                runs = api.runs(f'{collector._wandb_entity}/{collector._wandb_project}', tag_filter)
+                runs = self._wandb_api.runs(
+                    f'{collector._wandb_entity}/{collector._wandb_project}', filters=tag_filter
+                )
                 insert_verbose = lambda run: collector._insert_wandb_run(run, verbose)
                 if parallel:
                     with ThreadPool(int(os.cpu_count() * 0.5)) as pool:

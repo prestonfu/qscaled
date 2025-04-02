@@ -1,3 +1,4 @@
+import pandas as pd
 import time
 
 
@@ -18,6 +19,11 @@ def retry(times, exceptions=Exception):
         return newfn
 
     return decorator
+
+
+@retry(5)
+def get_wandb_run_history(run, keys=None):
+    return run.history(samples=100000, keys=keys)
 
 
 def flatten_dict(input_dict, parent_key='', sep='.'):

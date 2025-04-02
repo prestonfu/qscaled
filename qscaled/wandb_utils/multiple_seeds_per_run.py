@@ -2,10 +2,10 @@ import numpy as np
 import pandas as pd
 import re
 from functools import reduce
-from typing import Dict, Tuple, List, Any
+from typing import Dict, Tuple, List, Union, Any
 
 from qscaled.wandb_utils.base_collector import BaseCollector
-from qscaled.wandb_utils import flatten_dict, retry, get_dict_value
+from qscaled.wandb_utils import flatten_dict, get_wandb_run_history, get_dict_value
 
 
 class MultipleSeedsPerRunCollector(BaseCollector):
@@ -18,7 +18,7 @@ class MultipleSeedsPerRunCollector(BaseCollector):
         self,
         wandb_entity: str,
         wandb_project: str,
-        wandb_tags: List[str] | str = [],
+        wandb_tags: Union[List[str], str] = [],
         use_cached: bool = True,
         parallel: bool = True,
     ):
@@ -33,7 +33,7 @@ class MultipleSeedsPerRunCollector(BaseCollector):
     def _set_hparams(self):
         self._hparams = ['env', 'utd', 'batch_size', 'learning_rate']
 
-    def prepare_zip_export_data(self, metric, logging_freq=None) -> Dict[Any, np.typing.NDArray]:
+    def prepare_zip_export_data(self, metric, logging_freq=None) -> Dict[Any, np.ndarray]:
         data_dict = {}
         merge_fn = lambda l, r: pd.merge(l, r, on=self._env_step_key, how='outer')
 
@@ -73,7 +73,7 @@ class ExampleMultipleSeedsPerRunCollector(MultipleSeedsPerRunCollector):
         self,
         wandb_entity: str,
         wandb_project: str,
-        wandb_tags: List[str] | str = [],
+        wandb_tags: Union[List[str], str] = [],
         use_cached: bool = True,
         parallel: bool = True,
     ):
@@ -106,26 +106,22 @@ class ExampleMultipleSeedsPerRunCollector(MultipleSeedsPerRunCollector):
         key = (env, utd, batch_size, learning_rate)  # key is given in same order as `self._hparams`
         return key
 
-    def wandb_fetch(self, run, num_tries=5) -> Tuple[Dict[str, Any], pd.DataFrame] | None:
+    def wandb_fetch(self, run) -> Union[Tuple[Dict[str, Any], pd.DataFrame], None]:
         """Returns run metadata and history. If fails, returns None."""
-
-        @retry(num_tries)
-        def helper(config):
-            num_seeds = config['num_seeds']
-            df = run.history(samples=10000)
-            seed_keys = [f'seed{i}/{k}' for k in self._wandb_seed_metrics for i in range(num_seeds)]
-            keys = [self._env_step_key] + seed_keys + self._wandb_global_metrics
-            df = df[keys]
-            metadata = {
-                'id': run.id,
-                'name': get_dict_value(config, ['logging.exp_name', 'exp_name']),
-                'group': get_dict_value(config, ['logging.group', 'wandb_group']),
-                'runtime_mins': float(run.summary['_runtime'] / 60),
-                'last_step': df[self._env_step_key].iloc[-1],
-            }
-            if len(df) >= 10:
-                return metadata, df
-            else:
-                return None
-
-        return helper(flatten_dict(run.config))
+        config = flatten_dict(run.config)
+        result = get_wandb_run_history(run)
+        if result is None or len(result) < 10:
+            return None
+        df = result
+        num_seeds = config['num_seeds']
+        seed_keys = [f'seed{i}/{k}' for k in self._wandb_seed_metrics for i in range(num_seeds)]
+        keys = [self._env_step_key] + seed_keys + self._wandb_global_metrics
+        df = df[keys]
+        metadata = {
+            'id': run.id,
+            'name': get_dict_value(config, ['logging.exp_name', 'exp_name']),
+            'group': get_dict_value(config, ['logging.group', 'wandb_group']),
+            'runtime_mins': float(run.summary['_runtime'] / 60),
+            'last_step': df[self._env_step_key].iloc[-1],
+        }
+        return metadata, df

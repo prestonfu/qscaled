@@ -4,17 +4,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from tqdm import tqdm
-from typing import Tuple
-from rliable import plot_utils
+from typing import Tuple, List, Union
+from rliable import plot_utils as rliable_plot_utils
 from matplotlib.lines import Line2D
 
-from qscaled.utils.power_law import fit_powerlaw, power_law_with_const
-from qscaled.utils.plot_utils import (
-    make_smooth_x_range,
-    ax_set_x_bounds_and_scale,
-    ax_set_y_bounds_and_scale,
-    COLORS,
-)
+from qscaled.utils import power_law, plot_utils
+from qscaled.utils.state import remove_with_prompt
 
 
 def compute_data_efficiency_per_env(df, envs):
@@ -141,11 +136,12 @@ def make_data_pareto_fits(
 
     fits = []
     for i in tqdm(range(n_thresholds)):
-        params = fit_powerlaw(utds[:], mean_normalized_times[:, i])
+        params = power_law.fit_powerlaw(utds[:], mean_normalized_times[:, i])
         fits.append(params)
 
     if output_dir is not None:
         full_path = f'{output_dir}/data_pareto_fit/{save_name}.npy'
+        remove_with_prompt(full_path)
         os.makedirs(os.path.dirname(full_path), exist_ok=True)
         np.save(full_path, fits)
 
@@ -163,13 +159,13 @@ def plot_utd_data_pareto_fits(
     fig, axes = plt.subplots(1, 2, figsize=(10, 4), sharex=True, sharey=True)
     n_thresholds = len(thresholds)
     colors = sns.color_palette('viridis', n_colors=n_thresholds)
-    x_smooth = make_smooth_x_range(utds)
+    x_smooth = plot_utils.make_smooth_x_range(utds)
 
     def helper(ax, fits, median_median, label: str):
         for i in range(n_thresholds):
             a, b, c = fits[i]
-            data = power_law_with_const(x_smooth, a, b, c) * median_median
-            ax.plot(x_smooth, data, '-', color=colors[i], label=thresholds[i])
+            data = power_law.power_law_with_const(x_smooth, a, b, c) * median_median
+            ax.plot(x_smooth, data, '-', color=colors[i], label=f'{thresholds[i]:.2f}')
 
         ax.set_xscale('log')
         ax.set_yscale('log')
@@ -198,7 +194,8 @@ def plot_clean_utd_data_pareto_fit(
     thresholds,
     threshold_idx=-1,
     show_baseline=True,
-    ylim: Tuple[float, float] | None = None,
+    ylim: Union[Tuple[float, float], None] = None,
+    yticks: Union[List[float], None] = None,
     yscale: str = '1',
 ):
     fig, ax = plt.subplots(1, 1, figsize=(10, 8))
@@ -208,8 +205,8 @@ def plot_clean_utd_data_pareto_fit(
 
     def helper(median_median, fits, normalized_times_all, color, label):
         a, b, c = fits[threshold_idx]
-        utd_line = make_smooth_x_range(utds)
-        data_line = power_law_with_const(utd_line, a, b, c) * median_median
+        utd_line = plot_utils.make_smooth_x_range(utds)
+        data_line = power_law.power_law_with_const(utd_line, a, b, c) * median_median
         plt.scatter(
             utds,
             np.mean(normalized_times_all[..., threshold_idx], axis=0) * median_median,
@@ -226,7 +223,11 @@ def plot_clean_utd_data_pareto_fit(
 
     dot_line = Line2D([0], [0], marker='o', color='w', markerfacecolor='gray', markersize=10)
     ours_fit_line, ours_asymptote_line = helper(
-        ours_median_median, ours_fits, ours_normalized_times_all, color=COLORS[1], label='Ours'
+        ours_median_median,
+        ours_fits,
+        ours_normalized_times_all,
+        color=plot_utils.COLORS[1],
+        label='Ours',
     )
     lines = [dot_line, ours_fit_line]
     labels = ['Empirical value', 'Ours $\mathcal{D}_J(\sigma)$']
@@ -236,7 +237,7 @@ def plot_clean_utd_data_pareto_fit(
             baseline_median_median,
             baseline_fits,
             baseline_normalized_times_all,
-            color=COLORS[4],
+            color=plot_utils.COLORS[4],
             label='Baseline',
         )
         lines.append(baseline_fit_line)
@@ -250,7 +251,7 @@ def plot_clean_utd_data_pareto_fit(
     plt.xscale('log')
     plt.yscale('log')
 
-    plot_utils._annotate_and_decorate_axis(
+    rliable_plot_utils._annotate_and_decorate_axis(
         ax,
         xlabel='$\sigma$: UTD Ratio',
         ylabel='$\mathcal{D}_J$: Data until $J$',
@@ -260,10 +261,8 @@ def plot_clean_utd_data_pareto_fit(
         legend=False,
     )
 
-    x = np.logspace(np.log10(min(utds)), np.log10(max(utds)), num=len(utds))
-    x_ticks_labels = [round(x) if x >= 0.99 else f'{x:.2f}' for x in x]
-    ax.set_xticks(x, x_ticks_labels)
-    ax_set_y_bounds_and_scale(ax, ylim, yscale)
+    plot_utils.ax_set_x_bounds_and_scale(ax, xticks=utds, xfloat=min(utds) < 1)
+    plot_utils.ax_set_y_bounds_and_scale(ax, ylim, yticks, yscale)
 
     plt.show()
 
@@ -281,8 +280,8 @@ def _plot_compute_vs_data(
     plot_asymptote=True,
 ):
     a, b, c = fits[threshold_idx]
-    utd_line = make_smooth_x_range(utds)
-    data_line = power_law_with_const(utd_line, a, b, c) * median_median
+    utd_line = plot_utils.make_smooth_x_range(utds)
+    data_line = power_law.power_law_with_const(utd_line, a, b, c) * median_median
     grad_steps_line = utd_line * data_line
     batch_sizes_line = utd_to_batch_size_fn(utd_line)
     compute_line = 10 * grad_steps_line * batch_sizes_line * model_size
@@ -319,9 +318,11 @@ def plot_clean_compute_data_pareto_fit(
     thresholds,
     threshold_idx=-1,
     show_baseline=True,
-    xlim: Tuple[float, float] | None = None,
+    xlim: Union[Tuple[float, float], None] = None,
+    xticks: Union[List[float], None] = None,
     xscale: str = '1',
-    ylim: Tuple[float, float] | None = None,
+    ylim: Union[Tuple[float, float], None] = None,
+    yticks: Union[List[float], None] = None,
     yscale: str = '1',
 ):
     fig, axes = plt.subplots(1, 1, figsize=(10, 8))
@@ -338,7 +339,7 @@ def plot_clean_compute_data_pareto_fit(
         utds,
         model_size,
         threshold_idx,
-        color=COLORS[1],
+        color=plot_utils.COLORS[1],
     )
     lines = [dot_line, ours_fit_line]
     labels = ['Empirical value', 'Ours $\mathcal{D}_J(\mathcal{C}_J)$']
@@ -352,7 +353,7 @@ def plot_clean_compute_data_pareto_fit(
             utds,
             model_size,
             threshold_idx,
-            color=COLORS[4],
+            color=plot_utils.COLORS[4],
         )
         lines.append(baseline_fit_line)
         labels.append('Constant fit $\mathcal{D}_J(\mathcal{C}_J)$')
@@ -365,7 +366,7 @@ def plot_clean_compute_data_pareto_fit(
     plt.xscale('log')
     plt.yscale('log')
 
-    plot_utils._annotate_and_decorate_axis(
+    rliable_plot_utils._annotate_and_decorate_axis(
         axes,
         xlabel='$\mathcal{C}_J$: Compute until $J$',
         ylabel='$\mathcal{D}_J$: Data until $J$',
@@ -375,7 +376,7 @@ def plot_clean_compute_data_pareto_fit(
         legend=False,
     )
 
-    ax_set_x_bounds_and_scale(axes, xlim, xscale)
-    ax_set_y_bounds_and_scale(axes, ylim, yscale)
+    plot_utils.ax_set_x_bounds_and_scale(axes, xlim, xticks, xscale)
+    plot_utils.ax_set_y_bounds_and_scale(axes, ylim, yticks, yscale)
 
     plt.show()

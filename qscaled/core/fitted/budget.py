@@ -1,10 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from typing import Tuple
-from rliable import plot_utils
+from typing import Tuple, List, Union
+from rliable import plot_utils as rliable_plot_utils
 from matplotlib.colors import LinearSegmentedColormap
 
-from qscaled.utils.plot_utils import ax_set_x_bounds_and_scale, ax_set_y_bounds_and_scale, COLORS
+from qscaled.utils import plot_utils
 from qscaled.core.fitted.data_efficiency import _plot_compute_vs_data
 
 
@@ -17,18 +17,22 @@ def plot_compute_data_isoperformance(
     utds,
     model_size,
     delta,
-    xlim: Tuple[float, float] | None = None,
+    xlim: Union[Tuple[float, float], None] = None,
+    xticks: Union[List[float], None] = None,
     xscale: str = '1',
-    ylim: Tuple[float, float] | None = None,
+    ylim: Union[Tuple[float, float], None] = None,
+    yticks: Union[List[float], None] = None,
     yscale: str = '1',
     show_isocost=False,
-    isocost_xlim: Tuple[float, float] | None = None,
-    isocost_ylim: Tuple[float, float] | None = None,
+    isocost_xlim: Union[Tuple[float, float], None] = None,
+    isocost_ylim: Union[Tuple[float, float], None] = None,
 ):
     fig, ax = plt.subplots(1, 1)
     fig.set_size_inches(496.0 / 192 * 2 * 1.27, 369.6 / 192 * 2)
 
-    cmap = LinearSegmentedColormap.from_list('custom_gradient', [COLORS[0], COLORS[1]])
+    cmap = LinearSegmentedColormap.from_list(
+        'custom_gradient', [plot_utils.COLORS[0], plot_utils.COLORS[1]]
+    )
     n_colors = n_thresholds = len(thresholds)
     colors = [cmap(i / (n_colors - 1)) for i in range(n_colors)]
 
@@ -113,7 +117,7 @@ def plot_compute_data_isoperformance(
     plt.yscale('log')
     ax.legend(prop={'size': 14}, ncol=1, frameon=False)
 
-    plot_utils._annotate_and_decorate_axis(
+    rliable_plot_utils._annotate_and_decorate_axis(
         ax,
         xlabel='$\mathcal{C}_J$: Compute until $J$',
         ylabel='$\mathcal{D}_J$: Data until $J$',
@@ -123,8 +127,8 @@ def plot_compute_data_isoperformance(
         legend=False,
     )
 
-    ax_set_x_bounds_and_scale(ax, xlim, xscale)
-    ax_set_y_bounds_and_scale(ax, ylim, yscale)
+    plot_utils.ax_set_x_bounds_and_scale(ax, xlim, xticks, xscale)
+    plot_utils.ax_set_y_bounds_and_scale(ax, ylim, yticks, yscale)
 
     # Add colorbar
     sm = plt.cm.ScalarMappable(
@@ -147,9 +151,11 @@ def plot_budget_extrapolation(
     delta,
     thresholds,
     n_extrapolate_points,
-    xlim: Tuple[float, float] | None = None,
+    xlim: Union[Tuple[float, float], None] = None,
+    xticks: Union[List[float], None] = None,
     xscale: str = '1',
-    ylim: Tuple[float, float] | None = None,
+    ylim: Union[Tuple[float, float], None] = None,
+    yticks: Union[List[float], None] = None,
     yscale: str = '1',
 ):
     """
@@ -159,7 +165,9 @@ def plot_budget_extrapolation(
     fig, ax = plt.subplots(1, 1)
     fig.set_size_inches(496.0 / 192 * 2, 369.6 / 192 * 2)
 
-    cmap = LinearSegmentedColormap.from_list('custom_gradient', [COLORS[0], COLORS[1]])
+    cmap = LinearSegmentedColormap.from_list(
+        'custom_gradient', [plot_utils.COLORS[0], plot_utils.COLORS[1]]
+    )
     n_colors = len(thresholds)
     colors = [cmap(i / (n_colors - 1)) for i in range(n_colors)]
 
@@ -207,7 +215,7 @@ def plot_budget_extrapolation(
     plt.yscale('log')
     ax.legend(prop={'size': 14}, ncol=1, frameon=False)
 
-    plot_utils._annotate_and_decorate_axis(
+    rliable_plot_utils._annotate_and_decorate_axis(
         ax,
         xlabel='$\mathcal{F}_J$: Budget until $J$',
         ylabel='$\sigma^*$: optimal UTD',
@@ -217,8 +225,8 @@ def plot_budget_extrapolation(
         legend=False,
     )
 
-    ax_set_x_bounds_and_scale(ax, xlim, xscale)
-    ax_set_y_bounds_and_scale(ax, ylim, yscale)
+    plot_utils.ax_set_x_bounds_and_scale(ax, xlim, xticks, xscale)
+    plot_utils.ax_set_y_bounds_and_scale(ax, ylim, yticks, yscale, yfloat=True)
 
     # Print fitted function
     print(f'σ* = {10 ** coeffs[1]:.2e} × F_J^{coeffs[0]:.2f}')

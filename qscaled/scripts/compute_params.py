@@ -19,9 +19,7 @@ def compute_params(config, output_dir):
         .apply(bootstrapping.get_bootstrap_optimal, include_groups=False)
         .reset_index()
     )
-    best_lr_bs = bootstrapping.compute_bootstrap_averages(
-        best_lr, best_bs, best_lr_bs
-    )
+    best_lr_bs = bootstrapping.compute_bootstrap_averages(best_lr, best_bs, best_lr_bs)
 
     # Empirically, we find that using a shared slope does better.
     lr_regs_separate, bs_regs_separate = linear_fit.make_linear_fit_separate_slope(

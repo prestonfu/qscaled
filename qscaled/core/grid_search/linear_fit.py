@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 
 from qscaled.core.preprocessing import get_envs, get_utds
+from qscaled.utils.state import remove_with_prompt
 
 
 def make_linear_fit_separate_slope(df_best_lr_bs, outputs_dir=None, save_path=None):
@@ -56,6 +57,10 @@ def make_linear_fit_separate_slope(df_best_lr_bs, outputs_dir=None, save_path=No
 
     if outputs_dir is not None:
         save_dir = os.path.join(outputs_dir, 'grid_proposed_fits', save_path)
+        remove_with_prompt(
+            os.path.join(save_dir, 'separate_lr_fit.npy'),
+            os.path.join(save_dir, 'separate_bs_fit.npy'),
+        )
         os.makedirs(save_dir, exist_ok=True)
         np.save(os.path.join(save_dir, 'separate_lr_fit.npy'), lr_export)
         np.save(os.path.join(save_dir, 'separate_bs_fit.npy'), bs_export)
@@ -163,6 +168,10 @@ def make_linear_fit_shared_slope(df_best_lr_bs, outputs_dir=None, save_path=None
 
     if outputs_dir is not None:
         save_dir = os.path.join(outputs_dir, 'grid_proposed_fits', save_path)
+        remove_with_prompt(
+            os.path.join(save_dir, 'shared_lr_fit.npy'),
+            os.path.join(save_dir, 'shared_bs_fit.npy'),
+        )
         os.makedirs(save_dir, exist_ok=True)
         np.save(os.path.join(save_dir, 'shared_lr_fit.npy'), lr_export)
         np.save(os.path.join(save_dir, 'shared_bs_fit.npy'), bs_export)

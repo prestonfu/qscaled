@@ -3,11 +3,12 @@ import warnings
 import numpy as np
 import pandas as pd
 import pickle as pkl
-
+from copy import deepcopy
 from tqdm import tqdm
 from sklearn.isotonic import IsotonicRegression
 
 from qscaled.constants import QSCALED_PATH
+from qscaled.utils.state import remove_with_prompt
 
 
 def bootstrap_crossings(df, thresholds, filename: str, use_cached=True):
@@ -115,6 +116,7 @@ def bootstrap_crossings(df, thresholds, filename: str, use_cached=True):
             'crossings': crossings,
             'crossings_std': crossings_std,
         }
+        remove_with_prompt(bootstrap_cache_file)
         os.makedirs(os.path.dirname(bootstrap_cache_file), exist_ok=True)
         with open(bootstrap_cache_file, 'wb') as f:
             pkl.dump(results, f)
@@ -163,6 +165,78 @@ def select_middle_bs_lr(df):
 
     df = pd.DataFrame(filtered_rows)
     return df
+
+
+def filter_out_resets(df, reset_freq, window=0):
+    """
+    Filter out sharp drops in performance data. Useful for preprocessing returns
+    when there are agent resets.
+    - df: DataFrame loaded from zip
+    - reset_freq: Number of gradient steps between resets
+    - window: Number of steps to look forward for performance drop
+    """
+    filtered_df = deepcopy(df)
+
+    for i, row in reversed(list(df.iterrows())):
+        training_step = row['training_step']
+        returns = row['return']
+        mean_returns = row['mean_return']
+        std_returns = row['std_return']
+
+        reset_freq_envsteps = int(reset_freq / row['utd'])
+        reset_envsteps = np.arange(
+            reset_freq_envsteps, training_step.max() + 1, reset_freq_envsteps
+        )
+        if len(reset_envsteps) == 0:
+            continue
+
+        # Find the indices immediately after reset
+        post_reset_idxs = np.searchsorted(training_step, reset_envsteps, side='right')
+        padded_curr_reset_idxs = (
+            np.append(0, post_reset_idxs) + window
+        )  # Account for steps before first reset
+        padded_next_reset_idxs = np.append(
+            post_reset_idxs, len(training_step)
+        )  # Account for steps after last reset
+        mean_returns_pre_reset = np.append(float('-inf'), mean_returns[post_reset_idxs - 1])
+        std_returns_pre_reset = np.append(0, std_returns[post_reset_idxs - 1])
+
+        monotone_steps = []
+        monotone_returns = []
+        for (
+            mean_return_pre_reset,
+            std_return_pre_reset,
+            post_reset_idx,
+            post_next_reset_idx,
+        ) in zip(
+            mean_returns_pre_reset,
+            std_returns_pre_reset,
+            padded_curr_reset_idxs,
+            padded_next_reset_idxs,
+        ):
+            # Find the next point where performance recovers, as measured by overlapping (mean-stderr, mean+stderr) intervals
+            recovery_mask = (
+                mean_returns[post_reset_idx:post_next_reset_idx]
+                + std_returns[post_reset_idx:post_next_reset_idx]
+                >= mean_return_pre_reset - std_return_pre_reset
+            )
+            recovery_idxs = np.where(recovery_mask)[0] + post_reset_idx
+            if len(recovery_idxs) > 0:
+                min_recovery_idx = recovery_idxs[0]
+                monotone_steps.append(training_step[min_recovery_idx:post_next_reset_idx])
+                monotone_returns.append(returns[min_recovery_idx:post_next_reset_idx])
+
+        monotone_steps = np.concatenate(monotone_steps)
+        monotone_returns = np.concatenate(monotone_returns)
+
+        filtered_df.at[i, 'training_step'] = monotone_steps
+        filtered_df.at[i, 'return'] = monotone_returns
+        filtered_df.at[i, 'mean_return'] = np.mean(monotone_returns, axis=1)
+        filtered_df.at[i, 'std_return'] = np.std(monotone_returns, axis=1) / np.sqrt(
+            monotone_returns.shape[1]
+        )
+
+    return filtered_df
 
 
 def get_envs(df):

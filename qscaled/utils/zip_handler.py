@@ -3,12 +3,14 @@ import numpy as np
 import pandas as pd
 import subprocess
 from zipfile import ZipFile
+from typing import Union
 
-from qscaled.constants import QSCALED_PATH, suppress_overwrite_prompt
+from qscaled.constants import QSCALED_PATH
+from qscaled.utils.state import remove_with_prompt
 from qscaled.utils.configs import BaseConfig
 
 
-def replace_slash_with_period(s: str | None):
+def replace_slash_with_period(s: Union[str, None]):
     if s is None:
         return s
     return s.replace('/', '.')
@@ -20,27 +22,15 @@ def fetch_zip_data(config: BaseConfig, use_cached=True) -> pd.DataFrame:
     Otherwise writes data to zip using the wandb collector, and then loads from the zip file.
     """
     handler = ZipHandler(config)
-    full_prezip_path = os.path.join(handler._prezip_path, handler._config.name)
-    full_zip_path = os.path.join(handler._zip_path, f'{handler._config.name}.zip')
+    prezip_dir = os.path.join(handler._prezip_path, handler._config.name)
+    zip_path = os.path.join(handler._zip_path, f'{handler._config.name}.zip')
 
-    if not use_cached or not os.path.exists(full_zip_path):
+    if not use_cached or not os.path.exists(zip_path):
         collector = handler._config.wandb_collector
         assert collector is not None, (
             'Wandb collector must be provided if cache is unused or does not exist.'
         )
-
-        if os.path.exists(full_prezip_path) and not suppress_overwrite_prompt:
-            response = input(
-                f"Data for experiment '{handler._config.name}' already exists. Remove and overwrite? (y/N): "
-            ).lower()
-            if response == 'y':
-                os.remove(full_prezip_path)
-                if os.path.exists(full_zip_path):
-                    os.remove(full_zip_path)
-            else:
-                print('Cancelling operation.')
-                exit(0)
-
+        remove_with_prompt(zip_path, prezip_dir)
         handler.save_prezip()
         handler.save_zip()
 
