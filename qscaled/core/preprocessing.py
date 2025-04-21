@@ -32,7 +32,7 @@ def bootstrap_crossings(df, thresholds, filename: str, use_cached=True):
         row_crossings = []
         for threshold in thresholds:
             # Get crossing from isotonic regression
-            crossing_idx = np.where(row['return_isotonic'] > threshold)[0]
+            crossing_idx = np.where(row['return_isotonic'] >= threshold)[0]
             row_crossings.append(
                 row['training_step'][crossing_idx[0]] if len(crossing_idx) > 0 else np.nan
             )
@@ -50,64 +50,61 @@ def bootstrap_crossings(df, thresholds, filename: str, use_cached=True):
             crossings_std = results['crossings_std']
 
     else:
-
-        def _compute_nanstd(sample_crossings):
-            with warnings.catch_warnings(record=True) as w:
-                warnings.simplefilter(
-                    'always', category=RuntimeWarning
-                )  # Catch all RuntimeWarnings
-                crossings_std = np.nanstd(sample_crossings, axis=0)
-                for warning in w:
-                    if 'Degrees of freedom <= 0 for slice' in str(warning.message):
-                        warnings.warn(
-                            'It is probable that some environments do not reach every performance threshold '
-                            'for every UTD. This can cause the standard deviation to be zero. '
-                            'Consider decreasing your thresholds in the config, and call `bootstrap_crossings` '
-                            'with `use_cached=False`.',
-                            UserWarning,
-                        )
-                    print(warning.message)
-                return crossings_std
-
         iso_reg = []
         iso_reg_stds = []
         crossings = []
         crossings_std = []
-        for _, row in tqdm(df.iterrows(), total=len(df)):
-            n_bootstrap = 100  # Number of bootstrap samples. 100 seems enough for std to converge
-            ir = IsotonicRegression(out_of_bounds='clip')
-            x = row['training_step']
-            y_iso_samples = []
-            sample_crossings = []
-            for _ in range(n_bootstrap):
-                # Sample with replacement
-                sample_indices = np.random.randint(
-                    0, row['return'].shape[1], size=row['return'].shape[1]
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter('always', category=RuntimeWarning)
+
+            for _, row in tqdm(df.iterrows(), total=len(df)):
+                n_bootstrap = (
+                    100  # Number of bootstrap samples. 100 seems enough for std to converge
                 )
-                y = np.mean(
-                    row['return'][:, sample_indices], axis=1
-                )  # Average the bootstrap samples
-
-                # Fit isotonic regression on this bootstrap sample
-                ir.fit(x, y)
-                y_iso = ir.predict(x)
-                y_iso_samples.append(y_iso)
-
-                # For each bootstrap sample, find threshold crossings
-                sample_crossing = []
-                for threshold in thresholds:
-                    crossing_idx = np.where(y_iso > threshold)[0]
-                    crossing = (
-                        row['training_step'][crossing_idx[0]] if len(crossing_idx) > 0 else np.nan
+                ir = IsotonicRegression(out_of_bounds='clip')
+                x = row['training_step']
+                y_iso_samples = []
+                sample_crossings = []
+                for _ in range(n_bootstrap):
+                    # Sample with replacement
+                    sample_indices = np.random.randint(
+                        0, row['return'].shape[1], size=row['return'].shape[1]
                     )
-                    sample_crossing.append(crossing)
-                sample_crossings.append(sample_crossing)
+                    y = np.mean(
+                        row['return'][:, sample_indices], axis=1
+                    )  # Average the bootstrap samples
 
-            # Store mean prediction, crossing statistics, and isotonic std
-            iso_reg.append(y_iso_samples)
-            crossings.append(np.array(sample_crossings))
-            crossings_std.append(_compute_nanstd(sample_crossings))
-            iso_reg_stds.append(np.std(y_iso_samples, axis=0))
+                    # Fit isotonic regression on this bootstrap sample
+                    ir.fit(x, y)
+                    y_iso = ir.predict(x)
+                    y_iso_samples.append(y_iso)
+
+                    # For each bootstrap sample, find threshold crossings
+                    sample_crossing = []
+                    for threshold in thresholds:
+                        crossing_idx = np.where(y_iso >= threshold)[0]
+                        crossing = (
+                            row['training_step'][crossing_idx[0]]
+                            if len(crossing_idx) > 0
+                            else np.nan
+                        )
+                        sample_crossing.append(crossing)
+                    sample_crossings.append(sample_crossing)
+
+                # Store mean prediction, crossing statistics, and isotonic std
+                iso_reg.append(y_iso_samples)
+                crossings.append(np.array(sample_crossings))
+                crossings_std.append(np.nanstd(sample_crossings, axis=0))
+                iso_reg_stds.append(np.std(y_iso_samples, axis=0))
+
+            if any('Degrees of freedom <= 0 for slice' in str(warning.message) for warning in w):
+                print(
+                    'It is likely that some environments do not reach every performance threshold '
+                    'for every UTD. This can cause the standard deviation to be zero. '
+                    'Consider decreasing your thresholds in the config, and call `bootstrap_crossings` '
+                    'with `use_cached=False`.'
+                )
 
         # Save results to cache
         results = {
@@ -176,12 +173,15 @@ def filter_out_resets(df, reset_freq, window=0):
     - window: Number of steps to look forward for performance drop
     """
     filtered_df = deepcopy(df)
+    
+    # Prefill with junk values to match type
+    for col in ['training_step', 'return', 'mean_return', 'std_return']:
+        filtered_df[f'{col}_resetfilter'] = filtered_df[col]
+    filtered_df['reset_steps'] = filtered_df['training_step']
 
     for i, row in reversed(list(df.iterrows())):
         training_step = row['training_step']
-        returns = row['return']
         mean_returns = row['mean_return']
-        std_returns = row['std_return']
 
         reset_freq_envsteps = int(reset_freq / row['utd'])
         reset_envsteps = np.arange(
@@ -191,7 +191,7 @@ def filter_out_resets(df, reset_freq, window=0):
             continue
 
         # Find the indices immediately after reset
-        post_reset_idxs = np.searchsorted(training_step, reset_envsteps, side='right')
+        post_reset_idxs = np.searchsorted(training_step, reset_envsteps, side='left')
         padded_curr_reset_idxs = (
             np.append(0, post_reset_idxs) + window
         )  # Account for steps before first reset
@@ -199,42 +199,30 @@ def filter_out_resets(df, reset_freq, window=0):
             post_reset_idxs, len(training_step)
         )  # Account for steps after last reset
         mean_returns_pre_reset = np.append(float('-inf'), mean_returns[post_reset_idxs - 1])
-        std_returns_pre_reset = np.append(0, std_returns[post_reset_idxs - 1])
 
-        monotone_steps = []
-        monotone_returns = []
+        monotone_idx = []
         for (
             mean_return_pre_reset,
-            std_return_pre_reset,
             post_reset_idx,
             post_next_reset_idx,
         ) in zip(
             mean_returns_pre_reset,
-            std_returns_pre_reset,
             padded_curr_reset_idxs,
             padded_next_reset_idxs,
         ):
-            # Find the next point where performance recovers, as measured by overlapping (mean-stderr, mean+stderr) intervals
             recovery_mask = (
-                mean_returns[post_reset_idx:post_next_reset_idx]
-                + std_returns[post_reset_idx:post_next_reset_idx]
-                >= mean_return_pre_reset - std_return_pre_reset
+                mean_returns[post_reset_idx:post_next_reset_idx] >= mean_return_pre_reset
             )
             recovery_idxs = np.where(recovery_mask)[0] + post_reset_idx
             if len(recovery_idxs) > 0:
                 min_recovery_idx = recovery_idxs[0]
-                monotone_steps.append(training_step[min_recovery_idx:post_next_reset_idx])
-                monotone_returns.append(returns[min_recovery_idx:post_next_reset_idx])
+                monotone_idx.append(np.arange(min_recovery_idx, post_next_reset_idx))
 
-        monotone_steps = np.concatenate(monotone_steps)
-        monotone_returns = np.concatenate(monotone_returns)
-
-        filtered_df.at[i, 'training_step'] = monotone_steps
-        filtered_df.at[i, 'return'] = monotone_returns
-        filtered_df.at[i, 'mean_return'] = np.mean(monotone_returns, axis=1)
-        filtered_df.at[i, 'std_return'] = np.std(monotone_returns, axis=1) / np.sqrt(
-            monotone_returns.shape[1]
-        )
+        monotone_idx = np.concatenate(monotone_idx)
+        
+        for col in ['training_step', 'return', 'mean_return', 'std_return']:
+            filtered_df.at[i, f'{col}_resetfilter'] = filtered_df.at[i, col][monotone_idx]
+        filtered_df.at[i, 'reset_steps'] = reset_envsteps
 
     return filtered_df
 

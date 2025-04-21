@@ -1,27 +1,25 @@
+from __future__ import annotations
+
 import os
 import numpy as np
 import pandas as pd
 import subprocess
 from zipfile import ZipFile
-from typing import Union
+from typing import Union, TYPE_CHECKING
 
 from qscaled.constants import QSCALED_PATH
 from qscaled.utils.state import remove_with_prompt
-from qscaled.utils.configs import BaseConfig
+
+if TYPE_CHECKING:
+    from qscaled.utils.configs import BaseConfig
 
 
-def replace_slash_with_period(s: Union[str, None]):
-    if s is None:
-        return s
-    return s.replace('/', '.')
-
-
-def fetch_zip_data(config: BaseConfig, use_cached=True) -> pd.DataFrame:
+def fetch_zip_data(config: BaseConfig, use_cached=True, quiet=True) -> pd.DataFrame:
     """
     If `use_cached==True` and zip file exists, loads from the zip file directly.
     Otherwise writes data to zip using the wandb collector, and then loads from the zip file.
     """
-    handler = ZipHandler(config)
+    handler = config.zip_handler_cls(config)
     prezip_dir = os.path.join(handler._prezip_path, handler._config.name)
     zip_path = os.path.join(handler._zip_path, f'{handler._config.name}.zip')
 
@@ -32,18 +30,45 @@ def fetch_zip_data(config: BaseConfig, use_cached=True) -> pd.DataFrame:
         )
         remove_with_prompt(zip_path, prezip_dir)
         handler.save_prezip()
-        handler.save_zip()
+        handler.save_zip(quiet)
 
     return handler.load_df_from_zip()
 
 
-class ZipHandler:
-    """Handles saving and loading wandb collector offline returns data to/from zip files."""
+class BaseZipHandler:
+    """Base class for handling wandb collector offline returns data to/from zip files."""
 
     def __init__(self, config: BaseConfig):
         self._config = config
         self._prezip_path = f'{QSCALED_PATH}/prezip'
         self._zip_path = f'{QSCALED_PATH}/zip'
+
+    def save_zip(self, quiet=True):
+        """Saves prezip folder to zip."""
+        os.makedirs(self._zip_path, exist_ok=True)
+        if quiet:
+            quiet_kw = dict(stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        else:
+            quiet_kw = {}
+        subprocess.run(
+            f'zip -r {self._config.name}.zip {self._config.name} && mv {self._config.name}.zip {self._zip_path} && rm -rf {self._config.name}',
+            check=True,
+            shell=True,
+            cwd=self._prezip_path,
+            **quiet_kw
+        )
+
+    def _rename_wandb_metric(s: Union[str, None]):
+        if s is None:
+            return s
+        return s.replace('/', '.')
+
+
+class UTDZipHandler(BaseZipHandler):
+    """Handles saving and loading wandb collector offline returns data to/from zip files."""
+
+    def __init__(self, config: BaseConfig):
+        super().__init__(config)
 
     def save_prezip(self):
         """Saves offline returns data to prezip folder using wandb collector."""
@@ -51,7 +76,7 @@ class ZipHandler:
         data_dict = collector.prepare_zip_export_data(
             self._config.returns_key, self._config.logging_freq
         )
-        save_returns_key = replace_slash_with_period(self._config.returns_key)
+        save_returns_key = UTDZipHandler._rename_wandb_metric(self._config.returns_key)
 
         for key, data in data_dict.items():
             env, utd, batch_size, learning_rate = key
@@ -59,16 +84,6 @@ class ZipHandler:
             full_path = os.path.join(self._prezip_path, filename)
             os.makedirs(os.path.dirname(full_path), exist_ok=True)
             np.save(full_path, data)
-
-    def save_zip(self):
-        """Saves prezip folder to zip."""
-        os.makedirs(self._zip_path, exist_ok=True)
-        subprocess.run(
-            f'zip -r {self._config.name}.zip {self._config.name} && mv {self._config.name}.zip {self._zip_path}',
-            check=True,
-            shell=True,
-            cwd=self._prezip_path,
-        )
 
     def parse_filename(self, filename):
         """
@@ -80,7 +95,7 @@ class ZipHandler:
           ('Ant-v4', 1.0, 128, 0.0001)
         """
         _, utd_param, env_name, name, params = os.path.splitext(filename)[0].split('/')
-        if name != replace_slash_with_period(self._config.returns_key):
+        if name != UTDZipHandler._rename_wandb_metric(self._config.returns_key):
             return None
         utd = float(utd_param[len('utd_') :])
         params = params.split('_')  # Example: ['bs', 128, 'lr', 0.0001]

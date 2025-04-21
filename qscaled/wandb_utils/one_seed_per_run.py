@@ -29,27 +29,17 @@ class OneSeedPerRunCollector(BaseCollector):
     def _set_hparams(self):
         self._hparams = ['env', 'utd', 'batch_size', 'learning_rate']
 
-    def remove_short(self, thresh=0.95):
-        """Removes runs with less than `thresh` fraction of the maximum number of steps."""
-        for key in self.keys():
-            rundatas = self._rundatas[key]
-            step_counts = [rundata[self._env_step_key].iloc[-1] for rundata in rundatas]
-            max_step_count = max(step_counts)
-            for i, step_count in reversed(list(enumerate(step_counts))):
-                if step_count < thresh * max_step_count:
-                    rundatas.pop(i)
-
     def prepare_zip_export_data(self, metric, logging_freq=None) -> Dict[Any, np.ndarray]:
         data_dict = {}
         merge_fn = lambda l, r: pd.merge(l, r, on=self._env_step_key, how='outer')
 
         for env in self.get_unique('env'):
-            for utd in self.get_unique('utd', env=env):
-                filtered_rundatas = self.get_filtered_rundatas(env=env, utd=utd)
+            for utd in self.get_unique('utd', filter_str=f'env=="{env}"'):
+                filtered_rundatas = self.get_filtered_rundatas(f'env=="{env}" and utd=={utd}')
 
                 for key, rundatas in filtered_rundatas.items():
-                    bs = key[self._hparam_index['batch_size']]
-                    lr = key[self._hparam_index['learning_rate']]
+                    bs = key[self.hparam_index['batch_size']]
+                    lr = key[self.hparam_index['learning_rate']]
                     save_key = (env, utd, bs, lr)
                     dfs = []
 
@@ -106,18 +96,19 @@ class ExampleOneSeedPerRunCollector(OneSeedPerRunCollector):
         return key
 
     def wandb_fetch(self, run) -> Tuple[Dict[str, Any], pd.DataFrame]:
+        last_step = run.summary[self._env_step_key]
+        if last_step < 50e3:
+            return None
         config = flatten_dict(run.config)
         result = get_wandb_run_history(run)
-        if result is None or len(result) < 10:
+        if result is None:
             return None
-        df = result
-        keys = [self._env_step_key] + self._wandb_metrics
-        df = df[keys]
+        df = result[[self._env_step_key, *self._wandb_metrics]]
         metadata = {
             'id': run.id,
             'name': get_dict_value(config, ['logging.exp_name', 'exp_name']),
             'group': get_dict_value(config, ['logging.group', 'wandb_group']),
             'runtime_mins': float(run.summary['_runtime'] / 60),
-            'last_step': df[self._env_step_key].iloc[-1],
+            'last_step': run.summary[self._env_step_key],
         }
         return metadata, df

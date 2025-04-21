@@ -1,6 +1,6 @@
 import os
 import shutil
-from qscaled.constants import suppress_overwrite_prompt
+import qscaled.constants as const
 
 
 def remove_with_prompt(*paths):
@@ -8,7 +8,7 @@ def remove_with_prompt(*paths):
     existing_paths = [path for path in paths if os.path.exists(path)]
 
     if existing_paths:
-        if suppress_overwrite_prompt:
+        if const.suppress_overwrite_prompt:
             should_remove = True
         else:
             description = '\n'.join(['  ' + path for path in existing_paths])

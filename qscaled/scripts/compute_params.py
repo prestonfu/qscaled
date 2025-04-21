@@ -16,7 +16,7 @@ def compute_params(config, output_dir):
     best_bs = bootstrapping.grid_best_uncertainty_bs(grid_search_df)
     best_lr_bs = (
         best_lr.groupby(['env_name', 'utd'])
-        .apply(bootstrapping.get_bootstrap_optimal, include_groups=False)
+        .apply(bootstrapping.get_bootstrap_optimal)
         .reset_index()
     )
     best_lr_bs = bootstrapping.compute_bootstrap_averages(best_lr, best_bs, best_lr_bs)

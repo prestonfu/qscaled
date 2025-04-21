@@ -9,13 +9,13 @@ from typing import Dict, List, Tuple, Union, Any
 from tqdm import tqdm
 from multiprocessing.pool import ThreadPool
 
-from qscaled.constants import QSCALED_PATH, suppress_overwrite_prompt
+from qscaled.constants import QSCALED_PATH
 from qscaled.utils.state import remove_with_prompt
-from qscaled.wandb_utils import retry
 
 
 class BaseCollector(abc.ABC):
     """Base class for efficiently collecting run data using tags from WandB."""
+    MISSING_DATA_LABEL = 'missing_wandb_data'
 
     def __init__(
         self,
@@ -101,20 +101,23 @@ class BaseCollector(abc.ABC):
     def keys(self):
         return list(self._rundatas.keys())
     
+    def items(self):
+        return {key: (self._metadatas[key], self._rundatas[key]) for key in self.keys()}.items()
+
     def __len__(self):
         """Number of distinct keys."""
         return len(self.keys())
-    
+
     def size(self):
         """Number of distinct runs."""
         return sum(len(rundatas) for rundatas in self._rundatas.values())
 
     @property
-    def _num_hparams(self):
+    def num_hparams(self):
         return len(self._hparams)
 
     @property
-    def _hparam_index(self):
+    def hparam_index(self):
         return {hparam: i for i, hparam in enumerate(self._hparams)}
 
     def _insert_wandb_run(self, run, verbose=False):
@@ -164,12 +167,12 @@ class BaseCollector(abc.ABC):
         Find unique keys in hparam subject to constraints (default none).
         See `filter` for more details.
         """
-        if hparam not in self._hparam_index:
+        if hparam not in self.hparam_index:
             raise ValueError(
-                f'Invalid hparam: {hparam}. Must be one of {list(self._hparam_index.keys())}.'
+                f'Invalid hparam: {hparam}. Must be one of {list(self.hparam_index.keys())}.'
             )
         filtered_rundatas = self.filter(filter_str)
-        idx = self._hparam_index[hparam]
+        idx = self.hparam_index[hparam]
         unique = set(key[idx] for key in filtered_rundatas.keys())
         return sorted(list(unique))
 
@@ -187,7 +190,14 @@ class BaseCollector(abc.ABC):
             df = pd.DataFrame(columns=self._hparams)
         else:
             df = pd.DataFrame(keys, columns=self._hparams)
-        return [tuple(row) for _, row in df.query(filter_str).iterrows()]    
+        
+        try:            
+            return [tuple(row) for _, row in df.query(filter_str).iterrows()]
+        except pd.errors.UndefinedVariableError:
+            raise ValueError(
+                f'Invalid filter string: {filter_str}. '
+                'Make sure all variables are in the form of `hparam==value`.'
+            )
 
     def _get_filtered_datas(self, filter_str: str = None) -> Tuple[Dict, Dict]:
         """Returns two dictionaries: metadata and rundata."""
@@ -207,7 +217,7 @@ class BaseCollector(abc.ABC):
     def filter(self, filter_str: str):
         """
         Filters the collector by the constraints specified by `filter_str`,
-        a thin wrapper around `pd.DataFrame.query`. Returns a collector of the 
+        a thin wrapper around `pd.DataFrame.query`. Returns a collector of the
         same class.
 
         For example, if the collector has keys `(a, b, c)` and the user calls
@@ -219,6 +229,24 @@ class BaseCollector(abc.ABC):
         collector._metadatas = metadatas
         collector._rundatas = rundatas
         return collector
+
+    def remove_short(self, thresh=0.95):
+        """Removes runs with less than `thresh` fraction of the maximum number of steps."""
+        for key in self.keys():
+            metadatas = self._metadatas[key]
+            rundatas = self._rundatas[key]
+            max_steps = max(metadata['last_step'] for metadata in metadatas)
+            short_runs = [
+                i
+                for i, metadata in enumerate(metadatas)
+                if metadata['last_step'] < max_steps * thresh
+            ]
+            self._metadatas[key] = [
+                metadata for i, metadata in enumerate(metadatas) if i not in short_runs
+            ]
+            self._rundatas[key] = [
+                rundata for i, rundata in enumerate(rundatas) if i not in short_runs
+            ]
 
     def trim(self, num_seeds: int, compare_metric: str, compare_how: str, verbose: bool = False):
         """
@@ -267,7 +295,7 @@ class BaseCollector(abc.ABC):
             ):
                 collector._wandb_entity = None
                 collector._wandb_project = None
-            for key in collector.keys():
+            for key in set(collector.keys()) | set(other.keys()):
                 collector._metadatas[key].extend(other._metadatas[key])
                 collector._rundatas[key].extend(other._rundatas[key])
         return collector
@@ -298,6 +326,10 @@ class BaseCollector(abc.ABC):
             self._wandb_entity, self._wandb_project, wandb_tags=None
         )
         collectors = []
+        
+        num_threads = min(int(os.cpu_count() * 0.5), 10)  # Wandb connection pool size
+        if num_threads < 1:
+            parallel = False
 
         for tag in wandb_tags:
             collector = collector_factory()
@@ -318,7 +350,7 @@ class BaseCollector(abc.ABC):
                 )
                 insert_verbose = lambda run: collector._insert_wandb_run(run, verbose)
                 if parallel:
-                    with ThreadPool(int(os.cpu_count() * 0.5)) as pool:
+                    with ThreadPool() as pool:
                         list(tqdm(pool.imap(insert_verbose, runs), total=len(runs), desc=tqdm_desc))
                 else:
                     for run in tqdm(runs, total=len(runs), desc=tqdm_desc):

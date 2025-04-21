@@ -34,7 +34,7 @@ def _grid_best_uncertainty(df, param_name, print_pivot=False):
         # Time to hit thresholds[threshold_i]
         param_groups = group.groupby(param_key)
         time_to_threshold = param_groups.apply(
-            lambda x: x['crossings'].iloc[0][threshold_i], include_groups=False
+            lambda x: x['crossings'].iloc[0][threshold_i]
         ).dropna()
 
         if len(time_to_threshold) > 0:
@@ -47,7 +47,6 @@ def _grid_best_uncertainty(df, param_name, print_pivot=False):
         # Get bootstrap samples
         time_to_threshold_bootstrap = param_groups.apply(
             lambda x: x['crossings_bootstrap'].iloc[0][:, threshold_i],
-            include_groups=False,
         )
         param_values = np.array(time_to_threshold_bootstrap.index)
         times_bootstrap = np.array(time_to_threshold_bootstrap.tolist())
