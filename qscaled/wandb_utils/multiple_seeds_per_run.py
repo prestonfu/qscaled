@@ -105,8 +105,12 @@ class MultipleSeedsPerRunCollector(BaseCollector):
                 relabeled_rundatas.append(relabeled_rundata)
                 j += num_seeds
 
+            merged_rundatas = reduce(merge_fn, relabeled_rundatas)
+            merged_rundatas = merged_rundatas.dropna(
+                how='all', subset=merged_rundatas.columns.difference([self._env_step_key])
+            )
             new_collector._metadatas[key] = combined_metadata
-            new_collector._rundatas[key] = [reduce(merge_fn, relabeled_rundatas).dropna()]
+            new_collector._rundatas[key] = [merged_rundatas]
 
         return new_collector
 

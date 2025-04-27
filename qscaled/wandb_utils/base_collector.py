@@ -16,6 +16,7 @@ from qscaled.utils.state import remove_with_prompt
 class BaseCollector(abc.ABC):
     """Base class for efficiently collecting run data using tags from WandB."""
     MISSING_DATA_LABEL = 'missing_wandb_data'
+    NAN_DATA_LABEL = 'nan_wandb_data'
 
     def __init__(
         self,
@@ -230,7 +231,7 @@ class BaseCollector(abc.ABC):
         collector._rundatas = rundatas
         return collector
 
-    def remove_short(self, thresh=0.95):
+    def remove_short(self, thresh=1.0):
         """Removes runs with less than `thresh` fraction of the maximum number of steps."""
         for key in self.keys():
             metadatas = self._metadatas[key]
