@@ -57,15 +57,22 @@ class MultipleSeedsPerRunCollector(BaseCollector):
 
         return combined_metadata
 
-    def flatten(self, logging_freq=None, run_length_thresh=0.95):
+    def flatten(self, forward_fill_metrics=None, subset_logging_freq=None, round_logging_freq=None):
         """
-        Drops short runs, then concatenates the dataframes corresponding to
-        multiple runs for each key, so that each metadatas and rundatas has
-        length 1.
+        Concatenates the dataframes corresponding to multiple runs for each key, 
+        so that each metadatas and rundatas has length 1.
 
         For example, one run may have 5 seeds (seed0/ .. seed4/), and another may
         have 10 seeds (seed0/ .. seed9/). The resulting dataframe will have 15
         seeds (seed0/ .. seed14/).
+        
+        Applies forward fill to metrics listed in `forward_fill_metrics` after 
+        the last valid index.
+        
+        `subset_logging_freq` only includes rows where the environment step is a multiple of 
+        this value.
+        
+        `round_logging_freq` rounds the environment step to the nearest multiple of this value.
 
         Returns a new instance of the class with the flattened data.
         """
@@ -75,9 +82,16 @@ class MultipleSeedsPerRunCollector(BaseCollector):
             wandb_tags=None,
         )
         new_collector.copy_state(self)
-        new_collector.remove_short(run_length_thresh)
 
         merge_fn = lambda l, r: pd.merge(l, r, on=self._env_step_key, how='outer')
+        
+        def ffill_after_last_valid(s):
+            last_valid = s.last_valid_index()
+            if last_valid is None:
+                return s
+            before = s.loc[:last_valid]
+            after = s.loc[last_valid:].ffill()
+            return pd.concat([before, after[1:]])
 
         for key in self.keys():
             metadatas = self._metadatas[key]
@@ -100,12 +114,22 @@ class MultipleSeedsPerRunCollector(BaseCollector):
                         allowed_cols.append(col)
 
                 relabeled_rundata = rundata[allowed_cols].rename(columns=renamer)
-                if logging_freq is not None:
-                    relabeled_rundata = self._resolve_logging_freq(relabeled_rundata, logging_freq)
+                if subset_logging_freq is not None:
+                    relabeled_rundata = relabeled_rundata[
+                        relabeled_rundata[self._env_step_key] % subset_logging_freq == 0
+                    ]
+                if round_logging_freq is not None:
+                    relabeled_rundata = self._resolve_logging_freq(relabeled_rundata, round_logging_freq)
                 relabeled_rundatas.append(relabeled_rundata)
                 j += num_seeds
 
             merged_rundatas = reduce(merge_fn, relabeled_rundatas)
+            if forward_fill_metrics is not None:
+                for metric in forward_fill_metrics:
+                    metric_cols = [col for col in merged_rundatas.columns if re.search(rf'^seed\d+/{metric}$', col)]
+                    assert len(metric_cols) > 0, f'Metric {metric} not found in columns: {merged_rundatas.columns}.'
+                    merged_rundatas[metric_cols] = merged_rundatas[metric_cols].apply(ffill_after_last_valid)
+            
             merged_rundatas = merged_rundatas.dropna(
                 how='all', subset=merged_rundatas.columns.difference([self._env_step_key])
             )
@@ -113,6 +137,35 @@ class MultipleSeedsPerRunCollector(BaseCollector):
             new_collector._rundatas[key] = [merged_rundatas]
 
         return new_collector
+    
+    def sample_seeds(self, p):
+        """Sample fraction p of seeds from each run."""
+        for key in self.keys():
+            metadatas, rundatas = self._metadatas[key], self._rundatas[key]
+            for i, (metadata, rundata) in enumerate(zip(metadatas, rundatas)):
+                num_seeds = metadata['num_seeds']
+                if num_seeds <= 1:
+                    continue
+                num_samples = max(1, int(num_seeds * p))
+                sampled_seeds = np.random.choice(range(num_seeds), num_samples, replace=False)
+                sampled_seeds = {seed_num: i for i, seed_num in enumerate(sorted(sampled_seeds))}
+                sampled_cols = []
+                sampled_cols_renamed = []
+                for col in rundata.columns:
+                    if col.startswith('seed'):
+                        seed_num = int(col.split('/')[0][4:])
+                        if seed_num in sampled_seeds:
+                            sampled_cols.append(col)
+                            sampled_cols_renamed.append(
+                                f'seed{sampled_seeds[seed_num]}/{col.split("/")[1]}'
+                            )
+                    else:
+                        sampled_cols.append(col)
+                        sampled_cols_renamed.append(col)
+                new_rundata = rundata[sampled_cols]
+                new_rundata.columns = sampled_cols_renamed
+                metadatas[i]['num_seeds'] = num_samples
+                rundatas[i] = new_rundata
 
     def prepare_zip_export_data(self, metric, logging_freq=None) -> Dict[Any, np.ndarray]:
         data_dict = {}
@@ -134,6 +187,39 @@ class MultipleSeedsPerRunCollector(BaseCollector):
                     data_dict[save_key] = rundata[subset].to_numpy()
 
         return data_dict
+
+    def drop_bad_seeds(self, thresh=0.9, q=0.75):
+        """
+        Drop everything with final performance worse than `thresh` times the run
+        with quantile `q`.
+        """
+        for key in self.keys():
+            metadatas, rundatas = self._metadatas[key], self._rundatas[key]
+            empty = True
+            for i, (metadata, rundata) in enumerate(zip(metadatas, rundatas)):
+                if len(rundata) == 0:
+                    continue
+                empty = False
+                return_cols = [c for c in rundata if re.match(r'^seed\d+/return$', c)]
+                returns = np.nanmax(rundata[return_cols].values, axis=0)
+                return_thresh = np.quantile(returns, q) * thresh
+                good_seeds = {x: i for i, x in enumerate(sorted(np.where(returns >= return_thresh)[0]))}
+                num_good_seeds = len(good_seeds)
+                good_cols, good_cols_renamed = [], []
+                for c in rundata.columns:
+                    if c.startswith('seed'):
+                        seed_num = int(c.split('/')[0][4:])
+                        if seed_num in good_seeds:
+                            good_cols.append(c)
+                            good_cols_renamed.append(f'seed{good_seeds[seed_num]}/{c.split("/")[1]}')
+                    else:
+                        good_cols.append(c)
+                        good_cols_renamed.append(c)
+                metadata['num_seeds'] = num_good_seeds
+                rundatas[i] = rundata[good_cols].rename(columns=dict(zip(good_cols, good_cols_renamed)))
+            if empty:
+                self._metadatas.pop(key)
+                self._rundatas.pop(key)
 
 
 class ExampleMultipleSeedsPerRunCollector(MultipleSeedsPerRunCollector):
