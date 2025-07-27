@@ -47,6 +47,8 @@ def ax_set_x_bounds_and_scale(
     xticks: Union[List[float], None] = None,
     xscale: str = '1',
     xfloat: bool = False,
+    scale_xcoord: float = 1.0,
+    scale_ycoord: float = -0.17
 ):
     if xlim is not None or xticks is not None:
         assert (xlim is None) or (xticks is None), 'Cannot set both xlim and xticks'
@@ -64,11 +66,11 @@ def ax_set_x_bounds_and_scale(
 
     if xscale != '1':
         plt.text(
-            1.10,
-            -0.14,
+            scale_xcoord,
+            scale_ycoord,
             f'×{xscale}',
             transform=ax.transAxes,
-            horizontalalignment='right',
+            horizontalalignment='left',
             verticalalignment='bottom',
             fontsize='x-large',
             alpha=0.8,
@@ -98,7 +100,7 @@ def ax_set_y_bounds_and_scale(
 
     if yscale != '1':
         plt.text(
-            -0.045,
+            -0.06,
             0.93,
             f'×{yscale}',
             transform=ax.transAxes,

@@ -349,12 +349,13 @@ class BaseCollector(abc.ABC):
                 runs = self._wandb_api.runs(
                     f'{collector._wandb_entity}/{collector._wandb_project}', filters=tag_filter
                 )
+                runs = [r for r in tqdm(runs, desc=f'{tqdm_desc}: fetching')]
                 insert_verbose = lambda run: collector._insert_wandb_run(run, verbose)
                 if parallel:
                     with ThreadPool() as pool:
-                        list(tqdm(pool.imap(insert_verbose, runs), total=len(runs), desc=tqdm_desc))
+                        list(tqdm(pool.imap(insert_verbose, runs), total=len(runs), desc=f'{tqdm_desc}: inserting'))
                 else:
-                    for run in tqdm(runs, total=len(runs), desc=tqdm_desc):
+                    for run in tqdm(runs, total=len(runs), desc=f'{tqdm_desc}: inserting'):
                         insert_verbose(run)
 
                 collector.save_state(tag)
