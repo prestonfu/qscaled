@@ -1,0 +1,37 @@
+from dataclasses import dataclass, field
+from typing import Dict, List, Union, Optional
+
+from qscaled.wandb_utils.base_collector import BaseCollector
+from qscaled.utils.zip_handler import BaseZipHandler, UTDZipHandler
+
+
+@dataclass(kw_only=True)
+class BaseConfig:
+    name: str  # Name of the experiment, used for zip filename
+    max_returns: Dict[str, float]  # Maximum returns per environment
+    returns_key: str  # Logging key for returns
+    thresholds: List[int] = field(
+        default_factory=lambda: [100, 200, 300, 400, 500, 600, 700, 800]
+    )  # Return thresholds out of 1000
+    wandb_collector: Optional[BaseCollector] = (
+        None  # Wandb run collector; None if loading from zip directly
+    )
+    zip_handler_cls: Optional[BaseZipHandler] = UTDZipHandler  # Zip handler for saving/loading data
+    logging_freq: Optional[int] = None  # Rounds env steps up to nearest multiple of logging_freq
+
+
+@dataclass(kw_only=True)
+class SweepConfig(BaseConfig):
+    utds_to_predict: List[float]  # UTDs to predict hyperparams for
+    baseline_utd_at: Union[float, str] = (
+        'middle'  # UTD to use for baseline hyperparams; 'middle' approximates geo mean of utds_to_predict
+    )
+
+
+@dataclass(kw_only=True)
+class FittedConfig(BaseConfig):
+    sweep_name: str  # Copied from sweep config
+    sweep_slope_type: str  # 'separate' or 'shared'
+    model_size: int  # Number of critic parameters
+    budget_delta: float  # Balance coefficient for compute + delta * data
+    budget_extrapolate_top_k: int  # Number of performance thresholds to extrapolate optimal UTD
