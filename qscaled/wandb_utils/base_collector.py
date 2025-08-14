@@ -133,6 +133,7 @@ class BaseCollector(abc.ABC):
     def copy_state(self, collector):
         self._metadatas = deepcopy(collector._metadatas)
         self._rundatas = deepcopy(collector._rundatas)
+        self._wandb_metrics = deepcopy(collector._wandb_metrics)
 
     def load_state(self, tag):
         state = np.load(os.path.join(self._path, tag + '.npy'), allow_pickle=True)
@@ -350,12 +351,15 @@ class BaseCollector(abc.ABC):
                     f'{collector._wandb_entity}/{collector._wandb_project}', filters=tag_filter
                 )
                 runs = [r for r in tqdm(runs, desc=f'{tqdm_desc}: fetching')]
+                if len(runs) == 0:
+                    print(f'No runs found for {tqdm_desc}')
+                    continue
                 insert_verbose = lambda run: collector._insert_wandb_run(run, verbose)
                 if parallel:
                     with ThreadPool() as pool:
-                        list(tqdm(pool.imap(insert_verbose, runs), total=len(runs), desc=f'{tqdm_desc}: inserting'))
+                        list(tqdm(pool.imap(insert_verbose, runs), total=len(runs), desc=f'{tqdm_desc}: processing'))
                 else:
-                    for run in tqdm(runs, total=len(runs), desc=f'{tqdm_desc}: inserting'):
+                    for run in tqdm(runs, total=len(runs), desc=f'{tqdm_desc}: processing'):
                         insert_verbose(run)
 
                 collector.save_state(tag)
