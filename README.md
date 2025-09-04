@@ -1,9 +1,9 @@
 # Value-Based Deep RL Scales Predictably
-### [Paper](https://arxiv.org/abs/2502.04327)
+### [[Paper](https://arxiv.org/abs/2502.04327)] [[Website](https://value-scaling.github.io/)]
 
-Implementation of a workflow for evaluating trade-offs between data efficiency,
-compute efficiency, and performance for online RL, validated across multiple
-environments.
+A workflow for evaluating trade-offs between data efficiency,
+compute efficiency, and performance for online off-policy RL, validated across
+multiple algorithms and environments.
 
  [Oleh Rybkin](https://people.eecs.berkeley.edu/~oleh/)<sup>1</sup>,
  [Michal Nauman](https://scholar.google.com/citations?user=GnEVRtQAAAAJ&hl=en)<sup>1,2</sup>,
@@ -105,13 +105,15 @@ See [`experiments/outputs/grid_proposed_hparams`](experiments/outputs/grid_propo
 
 ## Citation
 ```bibtex
-@misc{rybkin2025valuebaseddeeprlscales,
-  title={Value-Based Deep RL Scales Predictably}, 
-  author={Oleh Rybkin and Michal Nauman and Preston Fu and Charlie Snell and Pieter Abbeel and Sergey Levine and Aviral Kumar},
+@inproceedings{
+  rybkin2025valuebased,
+  title={Value-Based Deep {RL} Scales Predictably},
+  author={Oleh Rybkin and Michal Nauman and Preston Fu and Charlie Victor Snell and Pieter Abbeel and Sergey Levine and Aviral Kumar},
+  booktitle={Forty-second International Conference on Machine Learning},
   year={2025},
   eprint={2502.04327},
   archivePrefix={arXiv},
   primaryClass={cs.LG},
-  url={https://arxiv.org/abs/2502.04327}, 
+  url={https://arxiv.org/abs/2502.04327}
 }
 ```

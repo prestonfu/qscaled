@@ -7,7 +7,7 @@ import subprocess
 from zipfile import ZipFile
 from typing import Union, TYPE_CHECKING
 
-from qscaled.constants import QSCALED_PATH
+import qscaled.constants as const
 from qscaled.utils.state import remove_with_prompt
 
 if TYPE_CHECKING:
@@ -40,8 +40,8 @@ class BaseZipHandler:
 
     def __init__(self, config: BaseConfig):
         self._config = config
-        self._prezip_path = f'{QSCALED_PATH}/prezip'
-        self._zip_path = f'{QSCALED_PATH}/zip'
+        self._prezip_path = f'{const.QSCALED_PATH}/prezip'
+        self._zip_path = f'{const.QSCALED_PATH}/zip'
 
     def save_zip(self, quiet=True):
         """Saves prezip folder to zip."""
