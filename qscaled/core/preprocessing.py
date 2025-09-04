@@ -7,12 +7,12 @@ from copy import deepcopy
 from tqdm import tqdm
 from sklearn.isotonic import IsotonicRegression
 
-from qscaled.constants import QSCALED_PATH
+import qscaled.constants as const
 from qscaled.utils.state import remove_with_prompt
 
 
 def bootstrap_crossings(df, thresholds, filename: str, use_cached=True):
-    bootstrap_cache_file = os.path.join(QSCALED_PATH, 'bootstrap_results', f'{filename}.pkl')
+    bootstrap_cache_file = os.path.join(const.QSCALED_PATH, 'bootstrap_results', f'{filename}.pkl')
 
     # Isotonic regression
     iso_reg_results = []

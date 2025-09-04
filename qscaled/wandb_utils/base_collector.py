@@ -9,7 +9,7 @@ from typing import Dict, List, Tuple, Union, Any
 from tqdm import tqdm
 from multiprocessing.pool import ThreadPool
 
-from qscaled.constants import QSCALED_PATH
+import qscaled.constants as const
 from qscaled.utils.state import remove_with_prompt
 
 
@@ -46,7 +46,7 @@ class BaseCollector(abc.ABC):
         self._wandb_entity = wandb_entity
         self._wandb_project = wandb_project
         self._wandb_api = wandb.Api(timeout=120)
-        self._path = os.path.join(QSCALED_PATH, 'collector', f'{wandb_entity}:{wandb_project}')
+        self._path = os.path.join(const.QSCALED_PATH, 'collector', f'{wandb_entity}:{wandb_project}')
         os.makedirs(self._path, exist_ok=True)
         self._metadatas = defaultdict(list)
         self._rundatas = defaultdict(list)
@@ -271,11 +271,8 @@ class BaseCollector(abc.ABC):
             elif len(rundatas) < num_seeds and verbose:
                 print(f'Warning: key {key} contains {len(rundatas)} < {num_seeds} runs')
 
-    def merge(self, collector):
-        return self.__class__.merge(self, collector)
-
-    @staticmethod
-    def merge(*collectors):
+    @classmethod
+    def merge(cls, *collectors):
         """
         Merge multiple BaseCollector-inherited objects of the same class.
 
